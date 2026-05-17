@@ -120,41 +120,16 @@ def parse_frontmatter(content: str) -> tuple[dict, str]:
     """
     Parse YAML frontmatter from markdown content.
 
-    Returns (frontmatter_dict, body_text).
-    If no frontmatter is found, returns ({}, content).
+    Returns (frontmatter_dict, body_text). Delegates to the canonical
+    :mod:`skill_utils` implementation (which uses ``yaml.safe_load``) so that
+    we no longer maintain a third hand-rolled parser (#1473).
     """
-    if not content.startswith("---"):
-        return {}, content
+    # Import lazily so that callers without skill_utils on sys.path (e.g.
+    # ad-hoc invocations of this script with a stripped-down environment)
+    # still get a helpful ImportError instead of a circular-import failure.
+    from skill_utils import parse_frontmatter as _shared_parse_frontmatter
 
-    # Find closing ---
-    rest = content[3:]
-    end_idx = rest.find("\n---")
-    if end_idx == -1:
-        return {}, content
-
-    fm_text = rest[:end_idx].strip()
-    body = rest[end_idx + 4 :].lstrip("\n")
-
-    frontmatter: dict[str, object] = {}
-    for line in fm_text.splitlines():
-        line = line.rstrip()
-        if not line or line.startswith("#"):
-            continue
-        if ":" in line:
-            key, _, val = line.partition(":")
-            key = key.strip()
-            val = val.strip()
-            # Handle quoted strings
-            if val.startswith('"') and val.endswith('"'):
-                val = val[1:-1]
-            elif val.startswith("'") and val.endswith("'"):
-                val = val[1:-1]
-            # Handle empty values
-            if val == "":
-                frontmatter[key] = None
-                continue
-            frontmatter[key] = val
-
+    frontmatter, body, _errors = _shared_parse_frontmatter(content)
     return frontmatter, body
 
 
@@ -186,11 +161,36 @@ def frontmatter_to_yaml(frontmatter: dict) -> str:
 
 
 def _format_yaml_value(key: str, val) -> str:
-    """Format a single YAML key-value pair."""
+    """Format a single YAML key-value pair.
+
+    Lists are emitted as a flow-style sequence (``[a, b, c]``) so that list
+    values such as ``tags:`` are not silently discarded (see #1462). Items
+    that look like they need quoting are quoted; otherwise they are emitted
+    bare.
+    """
     if val is None:
         return f"{key}:"
     if isinstance(val, list):
-        return f"{key}: []"
+        if not val:
+            return f"{key}: []"
+        items = []
+        for item in val:
+            item_str = str(item)
+            needs_quote = (
+                ":" in item_str
+                or "#" in item_str
+                or "," in item_str
+                or item_str.startswith("{")
+                or item_str.startswith("[")
+                or item_str.lower() in ("true", "false", "null", "yes", "no")
+                or not item_str
+            )
+            if needs_quote and not (item_str.startswith('"') and item_str.endswith('"')):
+                escaped = item_str.replace('"', '\\"')
+                items.append(f'"{escaped}"')
+            else:
+                items.append(item_str)
+        return f"{key}: [{', '.join(items)}]"
     val_str = str(val)
     # Quote strings that contain special chars or look like they need quoting
     needs_quote = (
@@ -584,7 +584,29 @@ def migrate_skill(
         "migrated" - skill was successfully written
         "failed"   - an error occurred
     """
-    target_path = SKILLS_DIR / f"{skill_name}.md"
+    # Defensive: skill_name may originate from external frontmatter; reject any
+    # value that would break out of SKILLS_DIR via path traversal or absolute
+    # paths (#1484). We require a simple filename component (no os.sep, no
+    # parent refs, no leading dot/slash).
+    if (
+        not skill_name
+        or "/" in skill_name
+        or "\\" in skill_name
+        or skill_name.startswith(".")
+        or skill_name in ("..", ".")
+    ):
+        print(f"  ERROR refusing unsafe skill_name: {skill_name!r}", file=sys.stderr)
+        return "failed"
+    target_path = (SKILLS_DIR / f"{skill_name}.md").resolve()
+    skills_root = SKILLS_DIR.resolve()
+    try:
+        target_path.relative_to(skills_root)
+    except ValueError:
+        print(
+            f"  ERROR refusing target path outside {skills_root}: {target_path}",
+            file=sys.stderr,
+        )
+        return "failed"
 
     if target_path.exists() and not force:
         return "skipped"
