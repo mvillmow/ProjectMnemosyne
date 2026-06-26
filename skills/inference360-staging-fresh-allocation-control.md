@@ -2,8 +2,8 @@
 name: inference360-staging-fresh-allocation-control
 description: "Validate and debug Inference360 staging/control API launches on fresh H200 Slurm allocations. Use when: (1) proving IFM or multi-model vLLM endpoints through the Inference360 control API, (2) reproducing Inference360 issue 257 / IFM corruption with vLLM, SGLang, HF, or XLLM comparison paths, (3) capturing logprobs, token IDs, launch commands, and Slurm cleanup evidence for H200 repro workflows."
 category: debugging
-date: 2026-06-25
-version: "1.1.0"
+date: 2026-06-26
+version: "1.2.0"
 user-invocable: false
 verification: verified-local
 history: inference360-staging-fresh-allocation-control.history
@@ -16,10 +16,10 @@ tags: [inference360, slurm, h200, control, staging, vllm, sglang, xllm, ifm, cor
 
 | Field | Value |
 | ------- | ------- |
-| **Date** | 2026-06-25 |
+| **Date** | 2026-06-26 |
 | **Objective** | Run Inference360 staging/control tests and deterministic IFM corruption repros through fresh H200 Slurm allocations without reusing existing model endpoints. |
-| **Outcome** | Successful local end-to-end cluster/control validation, plus issue 257 evidence showing the converted IFM 4B path corrupts under vLLM seed 42 while HF/native XLLM and compatible SGLang comparison still require another runtime/cluster. |
-| **Verification** | verified-local. The workflows ran live on H200 Slurm control/API paths and local validation passed, but CI validate was pending for the issue-257 PR at last poll. |
+| **Outcome** | Successful local end-to-end cluster/control validation, plus issue 257 evidence showing the converted IFM 4B path corrupts under vLLM seed 42 while HF/native XLLM and compatible SGLang comparison still require another runtime/cluster. PR 279 merged the runbook and tooling support after CI passed. |
+| **Verification** | verified-local. The live H200 Slurm control/API workflows ran locally; PR 279 CI passed and merged for the checked-in docs, smoke tests, and helper updates. The decisive cross-cluster comparison remains pending. |
 | **History** | [changelog](./inference360-staging-fresh-allocation-control.history) |
 
 ## When to Use
@@ -29,12 +29,14 @@ tags: [inference360, slurm, h200, control, staging, vllm, sglang, xllm, ifm, cor
 - You need evidence that a staging/control run allocated a fresh Slurm nodepool job and released it afterward.
 - A manifest-driven launch fails and you need to separate control-plane, artifact, and probe-token-budget failures.
 - You are investigating Inference360 issue 257, IFM corruption, converted checkpoint behavior, or parser-product versus true corruption classifications.
+- You need to separate issue 257's repetitive/gibberish reasoning corruption from the product/parser decision where an incomplete thinking tag returns `content: null`.
 - You need a reproducible engine/checkpoint comparison across vLLM, SGLang, optional HF checkpoint, and optional native XLLM while preserving raw request/response JSONL, logprobs, token IDs, launch commands, and Slurm cleanup snapshots.
 
 ## Verified Workflow
 
-> Verification note: This is verified locally only. It was executed live on the
-> H200 Slurm cluster and Inference360 control path on 2026-06-23, but not in CI.
+> Verification note: The H200 Slurm control/API workflows were verified locally.
+> The issue-257 docs, smoke tests, and helper updates passed PR 279 CI and merged,
+> but the HF/native XLLM/SGLang comparison matrix still needs a compatible cluster.
 
 ### Quick Reference
 
@@ -52,7 +54,10 @@ unless the user explicitly asks for reuse.
    for reasoning-heavy models.
 7. For issue-257 style corruption repros, run the runbook-local
    engine/checkpoint comparison runner against each fresh endpoint variant.
-8. Stop the service, release the nodepool allocation, stop control, and verify
+8. Classify repetitive/gibberish reasoning as corruption, and classify an
+   unclosed thinking tag returning content:null as a separate parser/product
+   decision unless the generated text itself is corrupt.
+9. Stop the service, release the nodepool allocation, stop control, and verify
    the Slurm job leaves the queue.
 ```
 
@@ -83,19 +88,21 @@ Detailed workflow from the verified session:
 
 Issue 257 engine/checkpoint comparison extension from the verified 2026-06-25 session:
 
-1. Keep one-off repro and debug scripts under `docs/runbooks/issue-257/`, not normal `scripts/` or test-package locations. This keeps issue-specific cluster probes near the runbook and out of reusable product surfaces.
-2. Use the checked-in runner `docs/runbooks/issue-257/engine_checkpoint_compare_seed42.py` and smoke tests in `docs/runbooks/issue-257/engine_checkpoint_compare_seed42_smoke.py`.
-3. Launch a fresh Inference360-managed H200 Slurm allocation through the control server for each endpoint variant. Do not reuse stale long-lived endpoints for corruption classification.
-4. Use explicit request `seed=42`, `max_tokens=256`, and a sentinel `seed=0`.
-5. For each endpoint variant, run these phases:
+1. Scope issue 257 to IFM 4B repetitive/gibberish reasoning corruption. Keep the separate product/parser behavior for incomplete reasoning tags returning `content: null` out of the corruption root-cause decision.
+2. Keep one-off repro and debug scripts under `docs/runbooks/issue-257/`, not normal `scripts/` or test-package locations. This keeps issue-specific cluster probes near the runbook and out of reusable product surfaces.
+3. Use the checked-in runner `docs/runbooks/issue-257/engine_checkpoint_compare_seed42.py` and smoke tests in `docs/runbooks/issue-257/engine_checkpoint_compare_seed42_smoke.py`.
+4. Launch a fresh Inference360-managed H200 Slurm allocation through the control server for each endpoint variant. Do not reuse stale long-lived endpoints for corruption classification.
+5. Use explicit request `seed=42`, `max_tokens=256`, and a sentinel `seed=0`.
+6. For each endpoint variant, run these phases:
    - `seed42-standard`: three standard repeats.
    - `seed42-logprobs`: `logprobs=true`, `top_logprobs=5`.
    - `seed42-logprobs-token-ids`: `logprobs=true`, `top_logprobs=5`, `return_token_ids=true`.
    - `sentinel-seed0-standard`: standard request with `seed=0`.
-6. Preserve full request and response JSONL, request/response SHA256s, prompt SHA, endpoint launch command in every trial row, `server.log`, Slurm job and node IDs, and `squeue`/`sacct` cleanup snapshots in the private artifact root.
-7. Use `scripts/ifm_corruption_trials.py` to summarize logprob and token-ID presence/count fields while preserving the full raw response body.
-8. For HF/native XLLM comparison on a cluster with those artifacts, run the same runner with `HF_MODEL_PATH`, `XLLM_MODEL_PATH`, `XLLM_TOKENIZER_PATH`, `XLLM_REPO`, and `XLLM_CONTAINER_IMAGE` set explicitly. If those paths are absent, record the path as skipped rather than pretending the comparison ran.
-9. For handoff to another cluster, append a sanitized GitHub issue comment with checkout, env vars, live command, interpretation matrix, and artifact reporting expectations. Keep raw internal paths and Slurm metadata in private runbooks or artifact logs unless explicit approval is given.
+7. Preserve full request and response JSONL, request/response SHA256s, prompt SHA, endpoint launch command in every trial row, `server.log`, Slurm job and node IDs, and `squeue`/`sacct` cleanup snapshots in the private artifact root.
+8. Use `scripts/ifm_corruption_trials.py` to summarize logprob and token-ID presence/count fields while preserving the full raw response body.
+9. For HF/native XLLM comparison on a cluster with those artifacts, run the same runner with `HF_MODEL_PATH`, `XLLM_MODEL_PATH`, `XLLM_TOKENIZER_PATH`, `XLLM_REPO`, `XLLM_CONTAINER_IMAGE`, and `LOG_ROOT` set explicitly. If those paths are absent, record the path as skipped rather than pretending the comparison ran.
+10. For handoff to another cluster, append a sanitized GitHub issue comment with checkout, env vars, live command, interpretation matrix, and artifact reporting expectations. Keep raw internal paths and Slurm metadata in private runbooks or artifact logs unless explicit approval is given.
+11. Interpret outcomes using this matrix: converted-only corruption points to conversion/artifact/remote-code path; HF vLLM corruption points to vLLM/XLLM integration, sampling, or model behavior; SGLang HF corruption means the issue is not vLLM-specific; SGLang HF clean with vLLM HF corrupt points to vLLM decode, KV, or sampling.
 
 Copy-paste issue-257 local validation commands:
 
@@ -210,10 +217,13 @@ Issue 257 observed results from branch `investigate/257-engine-checkpoint-compar
 
 ```text
 Issue: https://github.com/LLM360/Inference360/issues/257
+Scope: repetitive/gibberish IFM_4B reasoning corruption, not the separate
+       content:null incomplete-thinking-tag parser/product behavior
 Runbook runner: docs/runbooks/issue-257/engine_checkpoint_compare_seed42.py
 Runbook smoke: docs/runbooks/issue-257/engine_checkpoint_compare_seed42_smoke.py
 Trial logger: scripts/ifm_corruption_trials.py
 Detailed runbook: docs/runbooks/ifm-issue-257-corruption-investigation.md
+PR status: PR 279 passed CI and merged
 
 vLLM converted checkpoint:
   seed42-standard: corruption reproduced in 3/3 repeats
@@ -223,15 +233,21 @@ vLLM converted checkpoint:
 
 HF/native XLLM:
   exact 4B mid1 paths were not visible on the M2 host
-  runner records skipped unless explicit env vars are provided
+  runner records skipped unless HF_MODEL_PATH, XLLM_MODEL_PATH,
+  XLLM_TOKENIZER_PATH, XLLM_REPO, XLLM_CONTAINER_IMAGE, and LOG_ROOT are set
 
 SGLang:
   vLLM/XLLM image lacked the sglang module
   dedicated SGLang image rejected IFM parser flags
-  dedicated SGLang image without parser flags failed importing converted checkpoint remote code
+  dedicated SGLang image without parser flags failed importing converted checkpoint remote code:
+  TypeError: check_model_inputs() missing 1 required positional argument: 'func'
 
 Interpretation:
-  current evidence gives concrete token IDs/logprobs for the corrupt vLLM path
+  converted-only corruption -> conversion/artifact/remote-code path
+  HF vLLM corruption -> vLLM/XLLM integration, sampling, or model behavior
+  SGLang HF corruption -> not vLLM-specific
+  SGLang HF clean with vLLM HF corrupt -> vLLM decode/KV/sampling
+  current evidence gives concrete token IDs/logprobs for the corrupt vLLM converted path
   SGLang/HF/native XLLM comparison needs a compatible original checkpoint/runtime on another cluster
 ```
 
@@ -243,7 +259,7 @@ Issue 257 validation evidence:
 .venv/bin/python -m pytest docs/runbooks/issue-257/engine_checkpoint_compare_seed42_smoke.py passed, 4 tests
 PYTHON=.venv/bin/python INFERENCE360=.venv/bin/inference360 scripts/validate.sh passed, 819 passed, 8 skipped
 just validate was not usable because just resolved to a broken Python shim
-PR CI at last poll: CodeQL/secrets/SAST/SCA green; validate still in progress
+PR 279 CI passed and the PR merged
 ```
 
 ## Verified On
@@ -251,4 +267,4 @@ PR CI at last poll: CodeQL/secrets/SAST/SCA green; validate still in progress
 | Project | Context | Details |
 | ------- | ------- | ------- |
 | LLM360/Inference360 | H200 Slurm m2/mbzuai fresh-allocation staging/control validation for IFM 4B and 32B on 2026-06-23 | Live control/API probes passed for fresh job `1782986` on `fs-mbz-gpu-555`, and the allocation was released afterward. |
-| LLM360/Inference360 | Issue 257 IFM 4B converted-checkpoint corruption comparison on 2026-06-25 | Fresh-control H200 repro workflow produced vLLM seed-42 corruption evidence with logprobs/token IDs; HF/native XLLM and compatible SGLang comparison remained blocked on missing/compatible runtime paths. |
+| LLM360/Inference360 | Issue 257 IFM 4B converted-checkpoint corruption comparison on 2026-06-25 through PR 279 merge status on 2026-06-26 | Fresh-control H200 repro workflow produced vLLM seed-42 corruption evidence with logprobs/token IDs; PR 279 CI passed and merged; HF/native XLLM and compatible SGLang comparison remained blocked on missing/compatible runtime paths. |
