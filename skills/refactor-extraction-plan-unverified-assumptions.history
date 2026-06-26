@@ -1,13 +1,29 @@
+# refactor-extraction-plan-unverified-assumptions - History
+
+## v1.1.0 (2026-06-26)
+
+**Changed by:** Session context (ProjectHephaestus issue #1408 implementation-plan risk capture)
+**Verification:** unverified
+
+### What changed
+- Added boundary-safe shared utility extraction risks for plans that move subprocess/Git helper bodies into a lower-level utility module.
+- Added reviewer focus for stale line-number/search evidence, assumed helper names and exports, hidden dependency/import-cycle risk, behavioral parity, and over-broad retry wrappers.
+- Updated the reusable checklist with exact source-assumption categories an implementer must re-verify before coding.
+
+### Why
+The captured implementation plan had not been executed end-to-end and relied on remembered or previously generated search output. Reviewers need a durable checklist that separates plan intent from unverified source assumptions before approving a shared utility refactor.
+
+### Previous version (v1.0.0) snapshot
+
 ---
 name: refactor-extraction-plan-unverified-assumptions
-description: "The uncertain assumptions and reviewer risks baked into extraction/refactor PLANs that move function clusters or subprocess-backed helpers across module/package boundaries while preserving compatibility wrappers. Use when: (1) reviewing or authoring a plan that moves functions out of a god-module and re-exports moved names from the original module, (2) extracting shared utilities from a higher-level package into a lower-level utility module without violating import boundaries, (3) the plan claims old mock patch paths, helper exports, retries, timeouts, or dry-run behavior are preserved, (4) the plan cites exact line numbers or remembered search output for a multi-step edit, (5) the plan asserts 'no circular import' or 'unused import removable' by static reasoning rather than execution."
+description: "The uncertain assumptions and reviewer risks baked into a verbatim-move cluster-extraction PLAN that extracts a group of functions from a large module into a new sibling module with backward-compat `import X as X` re-exports in the parent. Use when: (1) reviewing or authoring a plan that moves a function cluster out of a god-module and re-exports the moved names from the original module to preserve mock patch paths, (2) the plan claims `patch(\"...old_module._fn\")` keeps working after the move, (3) the plan cites exact line numbers for a multi-step sequential edit, (4) the plan depends on a 'frozen' allowlist/magic-number invariant, (5) the plan asserts 'no circular import' or 'unused import removable' by static reasoning rather than execution."
 category: architecture
-date: 2026-06-26
-version: "1.1.0"
-history: refactor-extraction-plan-unverified-assumptions.history
+date: 2026-06-15
+version: "1.0.0"
 user-invocable: false
 verification: unverified
-tags: [refactoring, extraction, utility-extraction, cluster-extraction, backward-compat, re-export, mock-patch-path, planning, reviewer-risks, line-number-drift, circular-import, import-boundary, subprocess, assumptions]
+tags: [refactoring, extraction, cluster-extraction, backward-compat, re-export, mock-patch-path, planning, reviewer-risks, line-number-drift, circular-import, assumptions]
 ---
 
 # Refactor Extraction Plan — Unverified Assumptions & Reviewer Risks
@@ -16,17 +32,17 @@ tags: [refactoring, extraction, utility-extraction, cluster-extraction, backward
 
 | Field | Value |
 |-------|-------|
-| **Date** | 2026-06-26 |
-| **Objective** | Capture the uncertain assumptions extraction/refactor PLANs make, including verbatim function-cluster moves with compatibility re-exports and boundary-safe shared utility extraction into lower-level utility modules, so a reviewer knows exactly what to check before approving. |
-| **Outcome** | Plans produced; NOT executed. These are the assumptions a reviewer must verify and an implementer must not take on faith. v1.1.0 adds shared Git/subprocess utility extraction risk capture from an unimplemented issue #1408 plan. |
+| **Date** | 2026-06-15 |
+| **Objective** | Capture the uncertain assumptions a verbatim-move cluster-extraction PLAN makes — extracting a 12-function repo-management cluster from `hephaestus/automation/loop_runner.py` into a new `loop_repo_manager.py` with backward-compat `import X as X` re-exports (issue #1360) — so a reviewer knows exactly what to check before approving. |
+| **Outcome** | Plan produced; NOT executed. These are the assumptions a reviewer must verify and an implementer must not take on faith. |
 | **Verification** | unverified — planning artifact only; no code was written or run |
-| **History** | [changelog](./refactor-extraction-plan-unverified-assumptions.history) |
+| **History** | v1.0.0: initial capture of 5 uncertain assumptions + reviewer focus checklist from issue #1360 extraction plan. |
 
 > This skill is about the **PLANNING-RISK** angle, not the mechanics of *how* to extract a cluster.
 > For the how-to mechanics see `python-module-decomposition-and-refactor-patterns` and
 > `testing-module-patch-target-after-extraction`. For DRY *consolidation* (two modules → one)
 > see `dry-refactoring-plan-assumption-audit`. This skill covers a *single module → two modules*
-> verbatim move with re-exports, plus shared utility extraction into a lower-level module, and what silently breaks.
+> verbatim move with re-exports, and what silently breaks.
 
 ## When to Use
 
@@ -35,10 +51,6 @@ tags: [refactoring, extraction, utility-extraction, cluster-extraction, backward
 - The plan cites exact line numbers (`module.py:566-942`, `pyproject.toml:263`) for a sequence of edits that delete/insert large blocks.
 - The plan depends on a "frozen" list or magic number (e.g. an omit/coverage allowlist "frozen at N modules") that must be bumped in multiple places.
 - The plan asserts "introduces no circular import" or "this import is now unused and can be removed" by static reasoning rather than by actually importing/linting.
-- The plan extracts subprocess-backed helpers from a high-level package into a lower-level `utils`/shared module so sibling packages can reuse retry, timeout, dry-run, logging, or exception-handling behavior.
-- The plan keeps the old module as a compatibility wrapper and assumes downstream callers only import public helpers, not module-private state or old patch targets.
-- The plan proposes new public helper names or exports (for example, `git_push`, `git_rebase`, `run_git`) without re-reading the live module to confirm those names already exist or fit local naming conventions.
-- The plan replaces raw `subprocess.run` Git calls with shared wrappers but must preserve interactive/non-Git subprocesses as raw calls where appropriate.
 
 ## Verified Workflow
 
@@ -89,31 +101,6 @@ ruff check ${OLD_PATH} --select F401   # then `ruff check --fix` only after the 
 # 6. LINE-NUMBER DRIFT REMINDER — after the FIRST block deletion, every later cited line number is stale.
 #    Re-derive targets by stable marker, not by the plan's pre-edit numbers:
 grep -n "# Repo discovery\|^def _gh_list_repos\|^def _gh_" ${OLD_PATH}
-
-# === Boundary-safe shared utility extraction pre-flight ===
-# Replace paths with the modules in the plan.
-SOURCE_MODULE="package.high_level.git_helpers"
-SOURCE_PATH="package/high_level/git_helpers.py"
-TARGET_MODULE="package.utils.git"
-TARGET_PATH="package/utils/git.py"
-
-# 1. Re-run the searches the plan relied on immediately before implementation.
-rg -n "subprocess\\.run|Popen\\(" package tests scripts
-rg -n "from ${SOURCE_MODULE} import|import ${SOURCE_MODULE}" package tests scripts
-
-# 2. Confirm helper names and export surfaces from live code, not from memory.
-rg -n "^def |^__all__|METADATA_TIMEOUT|NETWORK_TIMEOUT|retry_with_backoff|run_subprocess" \
-  "${SOURCE_PATH}" "${TARGET_PATH}" package tests
-
-# 3. Prove the intended import direction by execution and static import-cycle tests.
-python -c "import ${SOURCE_MODULE}; import ${TARGET_MODULE}; print('import OK')"
-pytest tests/unit/utils/test_no_import_cycles.py tests/unit/validation/test_automation_boundary.py
-
-# 4. Check behavioral parity, not just delegation.
-pytest tests/unit/utils/test_git.py tests/unit/high_level/test_git_helpers.py
-
-# 5. Keep interactive or non-Git subprocesses out of generic retry wrappers unless verified.
-rg -n "gpg|gh tidy|Popen|stdin|tty|interactive|dry_run|dry-run" package tests scripts
 ```
 
 ### Detailed Steps
@@ -151,36 +138,6 @@ rg -n "gpg|gh tidy|Popen|stdin|tty|interactive|dry_run|dry-run" package tests sc
    deletion, grep each symbol in the file and let `ruff check --select F401` (then `--fix`) be the source
    of truth instead of eyeballing it.
 
-6. **Re-run all source searches before implementing a shared utility extraction plan.**
-   A plan that cites raw `subprocess.run` locations, function spans, or import-boundary files from remembered
-   search output is only a hypothesis. Before coding, re-run `rg` for raw subprocess sites, direct imports,
-   helper definitions, timeout constants, retry helpers, and `__all__` exports. Treat every line number in
-   the plan as a pre-edit snapshot until re-derived from the live tree.
-
-7. **Reconcile helper names and exports with live code before adding wrappers.**
-   Plans often propose clean names such as `git_push` or `git_rebase` because they are conceptually right,
-   not because those names already exist. Confirm the target module's naming style, public export mechanism,
-   and existing helper signatures before writing compatibility wrappers. A wrapper that exports the wrong
-   name can satisfy delegation tests while breaking real callers.
-
-8. **Move bodies only after checking hidden high-level dependencies.**
-   A lower-level utility module must not import the higher-level automation/GitHub package it is meant to
-   serve. Before moving helper bodies, inspect their imports, logging dependencies, config objects, timeout
-   constants, exception classes, and retry decorators. If any dependency points upward, either extract that
-   dependency too, pass it as a parameter, or keep the helper in the higher-level module.
-
-9. **Require behavioral parity tests for retry, timeout, dry-run, logging, capture, and exceptions.**
-   Compatibility wrappers are useful, but tests that only assert "old helper delegates to new helper" can mask
-   regressions in stdout/stderr capture, timeout propagation, dry-run no-op behavior, raised exception types,
-   retry predicates, and log messages. Move canonical behavior tests to the new utility module, then keep old
-   wrapper tests narrow and explicit about compatibility.
-
-10. **Do not wrap every subprocess just because it mentions GitHub or Git.**
-    Interactive or non-Git subprocesses may intentionally remain raw: signing commands, `gpg`, `gh tidy`
-    process orchestration, `Popen` streaming, TTY-sensitive calls, or commands whose dry-run semantics are
-    different from a normal Git operation. Shared wrappers should retry only the network-flaky operations they
-    were designed for, not local deterministic failures or interactive commands.
-
 ## Failed Attempts
 
 | Attempt | What Was Tried | Why It Failed | Lesson Learned |
@@ -190,11 +147,6 @@ rg -n "gpg|gh tidy|Popen|stdin|tty|interactive|dry_run|dry-run" package tests sc
 | Trust the "frozen at 16 modules" comment | Plan asserted the omit allowlist is frozen at 16 and only the comment + one test need bumping to 17, without running the test or reading its assertion body | The "16" figure and the assertion mechanism (count literal vs set membership) were read, not verified; a hardcoded `len(...) == 16` elsewhere, or a third copy of the count, would be missed and fail CI | When a plan depends on a frozen-list/magic-number invariant, READ the actual assertion body (don't trust the comment) and grep the literal to enumerate EVERY place it appears |
 | Reason about circular imports statically | Plan claimed `loop_repo_manager → ci_driver` adds no cycle because ci_driver references loop_runner only in comments | Static reasoning; ci_driver could import another automation module that transitively imports loop_runner at module load, creating a cycle the comment-scan never sees | The import-graph claim is only proven by the smoke-test step actually executing — label it "verify by execution," not "verified by reading" |
 | Hand-judge conditional unused-import removal | Plan said to drop `urlparse` and `gh_cli_timeout` from loop_runner "only if no other references remain," left to manual judgement | Removing a still-used import breaks the module; leaving a genuinely-unused one fails ruff F401 — both directions of hand-judgement are wrong | Gate each import removal on a per-symbol grep AFTER the deletion and make `ruff check --select F401` / `--fix` the source of truth, not eyeballing |
-| Reuse remembered search output as implementation coordinates | Plan cited raw subprocess sites, import-boundary files, and function spans from remembered/previous search output | The code may have moved; line numbers and even raw call locations can drift between planning and implementation | Re-run `rg` and re-open cited files immediately before coding; plans may cite search output as reviewer risk, not as fresh evidence |
-| Assume proposed helper names already exist | Plan named wrappers such as `git_push` and `git_rebase` because they are the desired API shape | The live target module may have different names, no `__all__`, or incompatible signatures | Reconcile exact helper names, signatures, and exports with live code before writing wrappers or tests |
-| Move helper bodies across an import boundary without dependency audit | Plan proposed moving a full helper body into a lower-level utility module | Hidden automation-only dependencies, logging/context objects, retry decorators, or exception classes can create upward imports or import cycles | Inspect imports and constants first; keep the dependency direction lower-level-only or pass collaborators explicitly |
-| Test only old-wrapper delegation after extraction | Plan kept compatibility wrappers and moved canonical tests but did not enumerate every behavior contract | Delegation tests can stay green while retry predicates, timeouts, dry-run behavior, stdout/stderr capture, logging, or exception types regress | Put canonical behavioral tests on the new utility module and make wrapper tests only verify compatibility entry points |
-| Wrap interactive or non-network subprocesses in generic Git retry helpers | Plan replaced raw subprocess calls broadly across GitHub-facing modules | Commands such as `gpg`, `gh tidy` orchestration, `Popen` streaming, or dry-run-sensitive calls may be intentionally raw and should not inherit network retries | Audit every raw call's semantics; only Git operations with the wrapper's retry/timeout contract should move |
 
 ## Results & Parameters
 
@@ -221,42 +173,6 @@ rg -n "gpg|gh tidy|Popen|stdin|tty|interactive|dry_run|dry-run" package tests sc
 - [ ] Are conditional import removals deferred to ruff (F401), not hand-judged?
 ```
 
-### Boundary-safe utility extraction checklist
-
-Use this when the plan moves subprocess-backed helpers into a shared utility module:
-
-```text
-## Shared utility extraction plan review checklist
-
-- [ ] Were all cited file paths, line numbers, function spans, and raw subprocess sites re-verified
-      immediately before implementation?
-- [ ] Do the proposed helper names, signatures, and exports exist or match the live target module's
-      conventions?
-- [ ] Does the moved code avoid importing back upward into the higher-level package?
-- [ ] Do tests exercise behavior in the new utility module, not only old compatibility-wrapper delegation?
-- [ ] Are retry and timeout policies limited to the operations they were designed for?
-- [ ] Are dry-run, logging, stdout/stderr capture, and exception-type contracts preserved?
-- [ ] Were interactive/non-Git subprocesses intentionally left raw unless a wrapper is proven appropriate?
-```
-
-### 2026-06-26 planning capture source assumptions
-
-The following are examples of plan evidence that must be treated as **unverified until re-run**:
-
-- Boundary guidance cited from project docs, such as a specific `CLAUDE.md` line.
-- Import-boundary and import-cycle tests cited by exact file and line.
-- `rg` results for imports, raw `subprocess.run` sites, and candidate replacement modules.
-- Exact function spans in the source helper module.
-- Assumptions about helper names, timeout constants, retry decorators, subprocess wrappers, and GitHub workflow behavior.
-
-Reviewer focus for this class of plan:
-
-- Import boundary and import-cycle regressions, especially when a lower-level package would indirectly import the higher-level package it is supposed to serve.
-- Behavioral parity of retry, timeout, dry-run, logging, stderr/stdout capture, and exception handling after extraction.
-- Patch targets moving from the old module to the new utility module, which can hide regressions if tests assert delegation only.
-- Interactive/non-Git subprocesses remaining raw where appropriate, especially signing, TTY-sensitive, and streaming process calls.
-- GitHub-facing wrappers avoiding over-broad retries for deterministic local failures while preserving dry-run semantics.
-
 ### Issue #1360 specific findings
 
 | Assumption in the plan | Status | What a reviewer must do |
@@ -272,4 +188,3 @@ Reviewer focus for this class of plan:
 | Project | Context | Details |
 |---------|---------|---------|
 | ProjectHephaestus | Planning phase for issue #1360 (extract 12-function repo-management cluster from `automation/loop_runner.py` into `loop_repo_manager.py` with backward-compat re-exports) | Plan produced, NOT executed; this skill records the unverified assumptions and reviewer risks. Implementation pending. |
-| ProjectHephaestus | Planning phase for issue #1408 (extract reusable Git subprocess helpers into a shared utility module with compatibility wrappers) | Plan produced, NOT executed; v1.1.0 records generic boundary-safe utility extraction assumptions and reviewer risks. Implementation pending. |
