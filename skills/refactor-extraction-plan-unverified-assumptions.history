@@ -1,13 +1,31 @@
+# refactor-extraction-plan-unverified-assumptions — History
+
+## v1.1.0 (2026-06-26)
+
+**Changed by:** Session context from ProjectHephaestus issue #1406 fleet_sync package-split planning.
+**Verification:** unverified
+
+### What changed
+- Added the file-to-package replacement assumption surface for `hephaestus.github.fleet_sync`.
+- Added reviewer checks for facade completeness, console entrypoint preservation, private helper imports, and monkeypatch paths after package conversion.
+- Added shared `hephaestus.github.git_ops` extraction risks around subprocess `cwd`, `env`, `check`, and `capture_output` behavior.
+- Added CLI parser-helper migration risks for `create_parser`, `--version`, epilog behavior, and broad argparse scope control.
+- Added test-split risks for `tests/unit/github/fleet_sync/` discovery and patch-target behavior.
+
+### Why
+The prior version covered a sibling-module cluster extraction with re-exported names. Issue #1406 plans a related but broader move: replacing a 1000+ line flat module with a package, preserving a console script and facade imports, extracting shared git subprocess helpers used by both `fleet_sync` and `tidy`, and moving tests into a package-shaped test tree. Those surfaces have the same core hazard — static source-reading evidence can make compatibility look safer than it is — but they add package import and CLI behavior risks that the original checklist did not name.
+
+### Previous version (v1.0.0) snapshot
+
 ---
 name: refactor-extraction-plan-unverified-assumptions
-description: "The uncertain assumptions and reviewer risks baked into an unexecuted Python extraction PLAN: sibling-module cluster extraction with backward-compat re-exports, or flat-file-to-package replacement that must preserve console entrypoints, facade imports, private helper compatibility, and test patch targets. Use when: (1) reviewing or authoring a plan that moves a function cluster out of a god-module and re-exports the moved names from the original module to preserve mock patch paths, (2) deleting `pkg/module.py` and replacing it with `pkg/module/__init__.py`, (3) the plan claims `patch(\"...old_module._fn\")` keeps working after the move, (4) the plan cites AST/line-range evidence for a multi-step sequential edit, (5) the plan extracts shared subprocess/git helpers used by multiple modules, (6) the plan asserts 'no circular import', 'CLI behavior preserved', or 'unused import removable' by static reasoning rather than execution."
+description: "The uncertain assumptions and reviewer risks baked into a verbatim-move cluster-extraction PLAN that extracts a group of functions from a large module into a new sibling module with backward-compat `import X as X` re-exports in the parent. Use when: (1) reviewing or authoring a plan that moves a function cluster out of a god-module and re-exports the moved names from the original module to preserve mock patch paths, (2) the plan claims `patch(\"...old_module._fn\")` keeps working after the move, (3) the plan cites exact line numbers for a multi-step sequential edit, (4) the plan depends on a 'frozen' allowlist/magic-number invariant, (5) the plan asserts 'no circular import' or 'unused import removable' by static reasoning rather than execution."
 category: architecture
-date: 2026-06-26
-version: "1.1.0"
+date: 2026-06-15
+version: "1.0.0"
 user-invocable: false
 verification: unverified
-history: refactor-extraction-plan-unverified-assumptions.history
-tags: [refactoring, extraction, cluster-extraction, package-split, file-to-package, backward-compat, facade-imports, console-entrypoint, re-export, mock-patch-path, subprocess-semantics, cli-parser, planning, reviewer-risks, line-number-drift, circular-import, assumptions]
+tags: [refactoring, extraction, cluster-extraction, backward-compat, re-export, mock-patch-path, planning, reviewer-risks, line-number-drift, circular-import, assumptions]
 ---
 
 # Refactor Extraction Plan — Unverified Assumptions & Reviewer Risks
@@ -16,27 +34,22 @@ tags: [refactoring, extraction, cluster-extraction, package-split, file-to-packa
 
 | Field | Value |
 |-------|-------|
-| **Date** | 2026-06-26 |
-| **Objective** | Capture the uncertain assumptions an extraction PLAN makes before implementation: v1.0 covered extracting a 12-function repo-management cluster from `hephaestus/automation/loop_runner.py` into `loop_repo_manager.py` with backward-compat `import X as X` re-exports (issue #1360); v1.1 adds the file-to-package split of `hephaestus.github.fleet_sync` into models/config/GPG/git-ops/conflict/coordinator/CLI modules plus shared `hephaestus.github.git_ops` (issue #1406). |
-| **Outcome** | Plans produced; NOT executed. These are the assumptions a reviewer must verify and an implementer must not take on faith. |
+| **Date** | 2026-06-15 |
+| **Objective** | Capture the uncertain assumptions a verbatim-move cluster-extraction PLAN makes — extracting a 12-function repo-management cluster from `hephaestus/automation/loop_runner.py` into a new `loop_repo_manager.py` with backward-compat `import X as X` re-exports (issue #1360) — so a reviewer knows exactly what to check before approving. |
+| **Outcome** | Plan produced; NOT executed. These are the assumptions a reviewer must verify and an implementer must not take on faith. |
 | **Verification** | unverified — planning artifact only; no code was written or run |
-| **History** | [changelog](./refactor-extraction-plan-unverified-assumptions.history) |
+| **History** | v1.0.0: initial capture of 5 uncertain assumptions + reviewer focus checklist from issue #1360 extraction plan. |
 
-> This skill is about the **PLANNING-RISK** angle, not the mechanics of *how* to extract a cluster or split a package.
+> This skill is about the **PLANNING-RISK** angle, not the mechanics of *how* to extract a cluster.
 > For the how-to mechanics see `python-module-decomposition-and-refactor-patterns` and
 > `testing-module-patch-target-after-extraction`. For DRY *consolidation* (two modules → one)
 > see `dry-refactoring-plan-assumption-audit`. This skill covers a *single module → two modules*
-> verbatim move with re-exports, or a *flat module → package facade* conversion, and what silently breaks.
+> verbatim move with re-exports, and what silently breaks.
 
 ## When to Use
 
 - Reviewing or authoring a plan that extracts a cluster of functions out of a large module into a new sibling module.
-- Reviewing or authoring a plan that deletes a flat module file and replaces it with a same-named package directory plus `__init__.py` facade.
 - The plan keeps the original module importable by adding `from .new_module import _fn as _fn` re-exports (backward-compat shim) and claims existing `unittest.mock.patch("...old_module._fn")` calls still work.
-- The plan must preserve a console script such as `console = pkg.module:main` while changing `pkg/module.py` into `pkg/module/__init__.py`.
-- The plan splits tests into a package-shaped directory and assumes pytest discovery plus monkeypatch paths still point at the intended owning modules.
-- The plan extracts shared subprocess/git helpers and assumes all callers have identical `cwd`, `env`, `check`, `capture_output`, timeout, and error-handling needs.
-- The plan migrates CLIs onto a parser helper and assumes help text, epilog suppression, duplicate `--version` handling, JSON/throttle options, and exit behavior remain byte-for-byte compatible.
 - The plan cites exact line numbers (`module.py:566-942`, `pyproject.toml:263`) for a sequence of edits that delete/insert large blocks.
 - The plan depends on a "frozen" list or magic number (e.g. an omit/coverage allowlist "frozen at N modules") that must be bumped in multiple places.
 - The plan asserts "introduces no circular import" or "this import is now unused and can be removed" by static reasoning rather than by actually importing/linting.
@@ -90,33 +103,6 @@ ruff check ${OLD_PATH} --select F401   # then `ruff check --fix` only after the 
 # 6. LINE-NUMBER DRIFT REMINDER — after the FIRST block deletion, every later cited line number is stale.
 #    Re-derive targets by stable marker, not by the plan's pre-edit numbers:
 grep -n "# Repo discovery\|^def _gh_list_repos\|^def _gh_" ${OLD_PATH}
-
-# 7. FILE-TO-PACKAGE COMPAT CHECK — prove every public import surface still resolves.
-#    Run this AFTER the package split, not during planning.
-python - <<'PY'
-import importlib
-mod = importlib.import_module("hephaestus.github.fleet_sync")
-assert getattr(mod, "main")
-print("facade import OK", mod.main)
-PY
-python - <<'PY'
-from importlib.metadata import entry_points
-eps = entry_points(group="console_scripts")
-ep = next(item for item in eps if item.name == "hephaestus-fleet-sync")
-assert ep.value == "hephaestus.github.fleet_sync:main"
-assert ep.load()
-print("console entrypoint OK")
-PY
-
-# 8. PRIVATE NAME / PATCH TARGET AUDIT — facade re-exports are not enough by themselves.
-rg "from hephaestus\.github\.fleet_sync import|hephaestus\.github\.fleet_sync\._" hephaestus tests scripts
-
-# 9. SHARED SUBPROCESS HELPER AUDIT — compare every old call-site flag before replacing it.
-rg "subprocess\.run|check=|capture_output=|cwd=|env=|timeout=" hephaestus/github/fleet_sync.py hephaestus/github/tidy.py
-
-# 10. CLI SNAPSHOT — preserve help/version behavior when adopting a parser helper.
-python -m hephaestus.github.fleet_sync --help > /tmp/fleet-sync.help.before
-python -m hephaestus.github.fleet_sync --version > /tmp/fleet-sync.version.before
 ```
 
 ### Detailed Steps
@@ -154,39 +140,6 @@ python -m hephaestus.github.fleet_sync --version > /tmp/fleet-sync.version.befor
    deletion, grep each symbol in the file and let `ruff check --select F401` (then `--fix`) be the source
    of truth instead of eyeballing it.
 
-6. **Treat flat-file-to-package replacement as a compatibility migration, not just a move.**
-   Deleting `pkg/module.py` and creating `pkg/module/__init__.py` changes import resolution, package
-   attributes, private helper ownership, monkeypatch strings, and console-entrypoint loading. Before
-   approving a plan, require explicit post-change checks for `importlib.import_module("pkg.module")`,
-   `importlib.metadata.entry_points(...).load()`, facade exports, and every private helper that tests or
-   downstream code may import. A facade that only re-exports public names can still break private patch
-   targets silently.
-
-7. **Do not accept AST/line-range module boundaries as behavior proof.**
-   AST ranges are good evidence that a candidate slice is coherent, but they do not prove import-time
-   side effects, hidden circular imports, top-level logger/config initialization order, or a test's patch
-   target assumptions. The implementation must import the facade and every extracted leaf module after
-   the move, then run the repo's import-cycle guard and the targeted tests.
-
-8. **Preserve subprocess semantics at the call-site level when extracting shared git helpers.**
-   A shared `git_ops.run_git()` used by two modules is only safe if each old call had the same `cwd`,
-   `env`, `check`, `capture_output`, `text`, timeout, stdout/stderr consumption, and exception handling
-   expectations. Build a before/after table from source for every replaced `subprocess.run` or git helper
-   call. When semantics differ, the abstraction must expose the difference explicitly rather than normalize
-   it away.
-
-9. **Snapshot CLI UX before adopting a parser helper.**
-   Migrating hand-built `argparse.ArgumentParser` code to a shared `create_parser` helper can drift
-   `--help`, `--version`, epilog text, duplicate version flags, default subcommand behavior, and option
-   ordering. Capture help/version output before the refactor, compare after, and keep broader
-   validation-wide parser-helper migrations out of scope unless the issue explicitly asks for them.
-
-10. **Keep test movement honest by preserving discovery and owning-module patch targets.**
-    Splitting one test file into `tests/unit/github/fleet_sync/` can accidentally weaken coverage if tests
-    patch facade aliases instead of the module where code under test looks up the symbol. Run discovery for
-    the new directory, grep every `patch(` and `monkeypatch.setattr`, and map each moved implementation
-    symbol to its owning module before accepting the split.
-
 ## Failed Attempts
 
 | Attempt | What Was Tried | Why It Failed | Lesson Learned |
@@ -196,11 +149,6 @@ python -m hephaestus.github.fleet_sync --version > /tmp/fleet-sync.version.befor
 | Trust the "frozen at 16 modules" comment | Plan asserted the omit allowlist is frozen at 16 and only the comment + one test need bumping to 17, without running the test or reading its assertion body | The "16" figure and the assertion mechanism (count literal vs set membership) were read, not verified; a hardcoded `len(...) == 16` elsewhere, or a third copy of the count, would be missed and fail CI | When a plan depends on a frozen-list/magic-number invariant, READ the actual assertion body (don't trust the comment) and grep the literal to enumerate EVERY place it appears |
 | Reason about circular imports statically | Plan claimed `loop_repo_manager → ci_driver` adds no cycle because ci_driver references loop_runner only in comments | Static reasoning; ci_driver could import another automation module that transitively imports loop_runner at module load, creating a cycle the comment-scan never sees | The import-graph claim is only proven by the smoke-test step actually executing — label it "verify by execution," not "verified by reading" |
 | Hand-judge conditional unused-import removal | Plan said to drop `urlparse` and `gh_cli_timeout` from loop_runner "only if no other references remain," left to manual judgement | Removing a still-used import breaks the module; leaving a genuinely-unused one fails ruff F401 — both directions of hand-judgement are wrong | Gate each import removal on a per-symbol grep AFTER the deletion and make `ruff check --select F401` / `--fix` the source of truth, not eyeballing |
-| Assume file-to-package replacement preserves every import surface | Plan deletes `hephaestus/github/fleet_sync.py` and creates `hephaestus/github/fleet_sync/__init__.py`, preserving `hephaestus-fleet-sync = hephaestus.github.fleet_sync:main` and facade imports by intent | Static import reasoning does not prove console entrypoint loading, private helper imports, patch strings, or downstream `from ...fleet_sync import _helper` call sites survive | Treat file-to-package conversion as a compatibility migration: run importlib, console-entrypoint, facade export, and repo-wide private import/patch audits after the move |
-| Treat AST/line-range module boundaries as behavior-proven | Plan derived modules (`models`, `config`, GPG, git ops, conflict resolver, coordinator, CLI) from AST and line ranges | AST slices do not prove top-level side effects, circular imports, lazy imports, logger/config initialization order, or monkeypatch assumptions | Use AST as planning evidence only; behavior proof requires importing each new module, running the import-cycle guard, and running targeted tests |
-| Normalize git subprocess calls into one helper without a call-site matrix | Plan extracts shared `hephaestus.github.git_ops` for `tidy` and `fleet_sync` | A shared helper can subtly change `cwd`, `env`, `check`, `capture_output`, stdout/stderr, timeout, or exception semantics even when command strings match | Build a before/after matrix for every subprocess/git call and keep semantic differences explicit in helper parameters |
-| Assume parser-helper adoption preserves CLI UX | Plan moves `fleet_sync` and `tidy` toward `hephaestus.cli.utils.create_parser` | Parser helpers can change help text, epilog suppression, duplicate `--version` handling, option ordering, JSON/throttle flags, and exit behavior | Snapshot `--help` and `--version` before the refactor and compare after; keep unrelated validation-wide `argparse.ArgumentParser` migrations out of scope |
-| Split tests into a package-shaped tree without proving discovery and patch targets | Plan moves tests under `tests/unit/github/fleet_sync/` and assumes monkeypatch paths adapt | Pytest discovery can change, and patching facade aliases may pass while failing to exercise the owning module binding that production code uses | Run discovery for the new directory, grep every patch/monkeypatch target, and patch the owning modules rather than convenience facade aliases |
 
 ## Results & Parameters
 
@@ -227,21 +175,6 @@ python -m hephaestus.github.fleet_sync --version > /tmp/fleet-sync.version.befor
 - [ ] Are conditional import removals deferred to ruff (F401), not hand-judged?
 ```
 
-### File-to-package split reviewer focus
-
-```
-## Flat-module-to-package plan review checklist
-
-- [ ] Does the plan prove `pkg.module` still imports after `pkg/module.py` becomes `pkg/module/__init__.py`?
-- [ ] Does the console entrypoint load the same `main` object after package conversion?
-- [ ] Does the facade preserve every documented import and every private helper that tests/downstream code patch?
-- [ ] Are module boundaries behavior-verified by import smoke tests and import-cycle tests, not only AST ranges?
-- [ ] Does shared git/subprocess extraction preserve `cwd`, `env`, `check`, `capture_output`, timeout, and error semantics per call site?
-- [ ] Was CLI help/version output snapshotted before migrating to a parser helper?
-- [ ] Is broader argparse-helper adoption explicitly out of scope unless the issue requires it?
-- [ ] Do split tests still discover and patch owning modules rather than facade aliases?
-```
-
 ### Issue #1360 specific findings
 
 | Assumption in the plan | Status | What a reviewer must do |
@@ -252,20 +185,8 @@ python -m hephaestus.github.fleet_sync --version > /tmp/fleet-sync.version.befor
 | `loop_repo_manager → ci_driver` adds no cycle | REASONED, NOT RUN | Run `python -c "import ...loop_runner; from ...automation import loop_repo_manager"` |
 | `urlparse` / `gh_cli_timeout` are safely removable | CONDITIONAL | Per-symbol grep after deletion; let `ruff --select F401` decide |
 
-### Issue #1406 specific findings
-
-| Assumption in the plan | Status | What a reviewer must do |
-|------------------------|--------|-------------------------|
-| Replacing `hephaestus/github/fleet_sync.py` with `hephaestus/github/fleet_sync/__init__.py` preserves compatibility | UNVERIFIED | Run importlib and console-entrypoint checks; grep private helper imports and patch targets across `hephaestus/`, `tests/`, and `scripts/` |
-| Proposed modules (`models`, `config`, GPG, fleet git ops, conflict resolver, coordinator, CLI) are behavior-safe | AST/LINE-RANGE EVIDENCE ONLY | Import every new module, run the import-cycle guard, and watch for hidden top-level side effects |
-| Shared `hephaestus.github.git_ops` fits both `fleet_sync` and `tidy` | UNVERIFIED | Compare old and new subprocess semantics per call site: `cwd`, `env`, `check`, `capture_output`, timeout, stdout/stderr, and exceptions |
-| `create_parser` migration preserves exact CLI behavior | UNVERIFIED | Snapshot and diff help/version output; verify epilog suppression, duplicate version args, JSON/throttle options, parser descriptions, and exit behavior |
-| Validation-wide `argparse.ArgumentParser` hits are out of scope | SCOPE RISK | Confirm the issue asks only for `fleet_sync`/`tidy` parser cleanup before ignoring broader hits |
-| Test split under `tests/unit/github/fleet_sync/` preserves coverage | UNVERIFIED | Run pytest discovery for the new directory and audit every patch/monkeypatch path against owning modules |
-
 ## Verified On
 
 | Project | Context | Details |
 |---------|---------|---------|
 | ProjectHephaestus | Planning phase for issue #1360 (extract 12-function repo-management cluster from `automation/loop_runner.py` into `loop_repo_manager.py` with backward-compat re-exports) | Plan produced, NOT executed; this skill records the unverified assumptions and reviewer risks. Implementation pending. |
-| ProjectHephaestus | Planning phase for issue #1406 (split 1000+ line `github/fleet_sync.py` into a package plus shared `github/git_ops`) | Plan produced, NOT executed; static source-reading facts came from `pyproject.toml`, `fleet_sync.py`, `tidy.py`, `cli/utils.py`, import-cycle tests, and `rg` output. No importlib, console entrypoint, pytest, ruff, mypy, gh/API, or GPG behavior was verified. |
