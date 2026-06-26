@@ -1,3 +1,27 @@
+# dry-refactoring-plan-assumption-audit — History
+
+## v2.2.0 (2026-06-26)
+
+**Changed by:** ProjectHephaestus issue #1409 planning (extract shared validation CLI parser helper)
+**Verification:** unverified — planning-stage learning only; implementation and CI were not executed.
+
+### What changed
+
+- Minor bump from v2.1.0 to v2.2.0.
+- Added the shared validation CLI parser extraction case to the description, tags, When to Use, Quick Reference, Detailed Steps, Failed Attempts, Results, and Verified On sections.
+- Captured the plan's highest-risk assumptions: issue count drift (issue said 16 validation files; current discovery cited 12 exact `--repo-root` matches), parser subclass behavior, `parse_known_args()` pass-through behavior, `__all__`/barrel export parity, and structural-grep false confidence.
+- Added a copy-paste parser extraction audit checklist for plan reviewers and implementers.
+
+### Why
+
+This belongs in the existing DRY refactoring planning audit because the search surface is the same: a behavior-preserving consolidation plan where stale issue evidence, incomplete population discovery, and unverified call-contract assumptions can make a mechanically plausible refactor unsafe. Someone reviewing a DRY extraction of repeated validation CLI parser setup should land here before approving the plan.
+
+### Previous version (v2.1.0) snapshot
+
+The full v2.1.0 text is preserved in git history at the commit preceding this amendment. v2.1.0 covered module-consolidation risks for `__all__`, early exits, test delegation shims, dependency assumptions, same-name signature collisions, TOML section-boundary regex behavior, and verified test counts. v2.2.0 leaves those lessons intact and adds the shared validation CLI parser planning-risk layer.
+
+---
+
 ---
 name: dry-refactoring-plan-assumption-audit
 description: "Checklist of hidden assumptions that bite DRY module-consolidation plans before implementation starts. Use when: (1) planning to merge two modules into one canonical, (2) replacing a module with a delegation shim that re-exports from the canonical, (3) porting tests from one file to another, (4) extending a main() function with new sub-checks, (5) consolidating two functions with the same name but different signatures."
