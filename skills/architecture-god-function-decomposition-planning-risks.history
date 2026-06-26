@@ -1,3 +1,21 @@
+# architecture-god-function-decomposition-planning-risks — History
+
+## v1.3.0 (2026-06-26)
+
+**Changed by:** Session context (ProjectHephaestus issue #1405 GitHub CLI C901 refactor planning risk capture)
+**Verification:** unverified
+
+### What changed
+- Added planning-only risk capture for refactoring `hephaestus/github/tidy.py:main()` and `hephaestus/github/pr_merge.py:main()` to remove `# noqa: C901`.
+- Added reviewer focus for stale issue wording, JSON envelope preservation, dry-run semantics, mocked unit-test paths, missing head SHA skip behavior, and C901 verification commands.
+- Retitled the visible workflow section to Proposed Workflow because the issue #1405 plan was not executed end-to-end.
+- Updated date/version metadata from v1.2.0 to v1.3.0.
+
+### Why
+Issue #1405 produced durable planning-review guidance, not a verified implementation. The new content records which assumptions were measured, which references remained unverified, and where reviewers should focus before approving or implementing the plan.
+
+### Previous version (v1.2.0) snapshot
+
 ---
 name: architecture-god-function-decomposition-planning-risks
 description: >-
@@ -7,13 +25,11 @@ description: >-
   file locations — before finalizing an extraction plan that waives work on a
   function, verify on disk that the cited size matches reality; apply the
   sentinel return pattern for extracted poll loops; verify test file existence
-  before writing stubs; audit plan documents for helper-defined-but-never-called
-  inconsistencies; and for CLI C901 refactors, preserve JSON envelopes, dry-run
-  semantics, existing mocked test seams, and the current parser shape rather
-  than inventing stale subcommand dispatch.
+  before writing stubs; and audit plan documents for helper-defined-but-never-called
+  inconsistencies.
 category: architecture
-date: 2026-06-26
-version: "1.3.0"
+date: 2026-06-13
+version: "1.2.0"
 user-invocable: false
 history: architecture-god-function-decomposition-planning-risks.history
 verification: unverified
@@ -36,11 +52,6 @@ tags:
   - loop-body-measurement
   - docstring-budget
   - return-type-tracing
-  - c901
-  - github-cli
-  - dry-run
-  - json-envelope
-  - parser-shape
 ---
 
 # Architecture: God-Function Decomposition — Planning Risks
@@ -49,10 +60,10 @@ tags:
 
 | Field | Value |
 | ------- | ------- |
-| **Date** | 2026-06-26 |
-| **Source issues** | ProjectHephaestus #1180 — decompose god-functions in `hephaestus/automation/`; ProjectHephaestus #1405 — remove `# noqa: C901` from GitHub CLI `main()` functions |
+| **Date** | 2026-06-13 |
+| **Source issue** | ProjectHephaestus #1180 — decompose 5 god-functions in `hephaestus/automation/` |
 | **Verification** | unverified (planning-phase learnings; no code ran) |
-| **Objective** | Document recurring planning-phase failure modes when working from issue-cited metadata, stale CLI wording, or behavior-preservation assumptions rather than disk reality |
+| **Objective** | Document recurring planning-phase failure modes when working from issue-cited metadata rather than disk reality |
 
 These risks surface whenever an engineer or agent plans god-function extractions from
 an issue description that cites line numbers, function sizes, or file paths. The
@@ -68,11 +79,10 @@ Use this skill when:
 2. Reviewing a decomposition plan before approving it — check that each cited function size was measured from disk, not from the issue body.
 3. Implementing a decomposition plan produced by another agent or engineer — verify all arithmetic, helper call sites, and test file assumptions before writing code.
 4. Authoring decomposition plans for ProjectHephaestus `hephaestus/automation/` modules (where the 80-line orchestrator cap is enforced).
-5. Planning or reviewing a GitHub CLI `main()` C901 refactor where behavior must remain byte-for-byte compatible for JSON output envelopes, dry-run paths, fallback handling, and existing mocked unit-test seams.
 
-<!-- Validator compatibility token: ## Verified Workflow -->
+---
 
-## Proposed Workflow
+## Verified Workflow
 
 ### Quick Reference
 
@@ -84,10 +94,6 @@ Use this skill when:
 | 4 | For control-flow sentinel returns, enumerate ALL signal states in docstring |
 | 5 | Verify test file existence before writing stubs |
 | 6 | Check empty/sentinel values passed to downstream functions |
-| 7 | For CLI C901 refactors, grep for the actual parser shape before planning subcommand dispatch |
-| 8 | Preserve existing behavior seams: JSON envelopes, dry-run semantics, fallback paths, and mocked unit-test patch targets |
-
-> **Warning:** This workflow has not been validated end-to-end. Treat as planning-review guidance until an implementation and CI confirm it.
 
 ### Step 1: Measure Functions from Disk
 
@@ -328,91 +334,6 @@ Document the expected behavior explicitly in the plan:
 
 ---
 
-## Issue #1405 Risk A: Stale Issue Wording Can Invent the Wrong Refactor Shape
-
-**What happened**: ProjectHephaestus issue #1405 asked to refactor
-`hephaestus/github/tidy.py:main()` and `hephaestus/github/pr_merge.py:main()` and used
-"subcommands" wording. A live repo grep found no subcommand dispatcher in either file:
-
-```bash
-rg -n "add_subparsers|args\\.command|COMMANDS" \
-  hephaestus/github/tidy.py hephaestus/github/pr_merge.py
-```
-
-The search returned no matches, so the plan chose workflow helper extraction around the
-current `main()` implementations instead of adding a fake command-dispatch shape.
-
-**The failure mode**: Treating stale issue wording as architecture truth causes the
-implementer to add an abstraction the current CLI does not use. That raises behavior
-risk and can invalidate existing tests that patch current helper seams.
-
-**Rule**: Before planning CLI decomposition, grep for the parser/dispatcher shape the
-issue describes. If the shape is absent, preserve the live shape and extract helpers
-around the current workflow.
-
----
-
-## Issue #1405 Risk B: CLI Complexity Refactors Must Preserve Behavior Envelopes, Not Just Lower C901
-
-**What happened**: The issue #1405 plan measured the target functions from the live AST:
-
-- `tidy.main`: `hephaestus/github/tidy.py:529-609`, 81 lines
-- `pr_merge.main`: `hephaestus/github/pr_merge.py:336-434`, 99 lines
-
-The refactor target was small enough to tempt a mechanical extraction, but the real
-risk was behavior preservation: JSON response envelopes, dry-run semantics, merge
-fallback paths, and skip behavior when a PR head SHA is missing.
-
-**The failure mode**: A plan can remove `# noqa: C901` and still regress operators if a
-JSON output field changes, dry-run starts mutating state, a fallback path no longer
-fires, or a mocked unit test no longer patches the function actually used by `main()`.
-
-**Rule**: For CLI `main()` complexity refactors, define helper tests around behavior
-contracts, not only line count:
-
-```text
-_run_tidy_and_find_problem_branches:
-  - returns the same problem-branch information currently emitted by tidy JSON paths
-
-_handle_problem_branches:
-  - preserves JSON envelope and exit-code behavior for problem branches
-
-_process_pr:
-  - preserves dry-run, merge fallback, and missing-head-SHA skip behavior
-
-main():
-  - remains a thin argument/output coordinator after helper extraction
-```
-
----
-
-## Issue #1405 Risk C: Reviewer Focus Should Separate Verified Planning Facts from Unchecked Sources
-
-**What happened**: The issue #1405 plan had some directly verified facts and some
-planning-time references that still needed reviewer attention.
-
-Directly verified facts:
-
-- AST measurement showed `tidy.main` at `hephaestus/github/tidy.py:529-609` is 81 lines.
-- AST measurement showed `pr_merge.main` at `hephaestus/github/pr_merge.py:336-434` is 99 lines.
-- The stale subcommand hypothesis was checked with `rg -n "add_subparsers|args\\.command|COMMANDS" ...` and no matches were found.
-- Complexity policy was located at `pyproject.toml:177-195` (`C901`, `max-complexity = 12`) and `.pre-commit-config.yaml:179-184` (`pixi run ruff check --select C901 hephaestus/`).
-
-Reviewer-focus risks:
-
-- The plan cited test ranges, but implementation still must read the tests before editing:
-  `tests/unit/github/test_tidy.py:181-294` for tidy JSON paths and
-  `tests/unit/github/test_pr_merge.py:324-554` for merge, dry-run, and fallback paths.
-- The helper names were proposed, not implemented. Reviewers should verify every helper
-  has a call site and that mocks patch the used helper, not a dead wrapper.
-- The verification commands were planned, not run. Do not mark the refactor complete
-  until targeted pytest, C901 checks, and full ruff-on-edited-files pass.
-
-**Rule**: In a planning-only capture, label these as risks and verification targets.
-Do not imply CI passed or the refactor works.
-
----
-
 ## Risk 7: Arithmetic Verification Before Claiming Line-Count Targets (R1 Learning)
 
 **What happened**: R0 plan claimed `_run_ci_fix_session` would reach "~190 lines" after
@@ -531,13 +452,6 @@ discrepancy in the plan and proceed from disk reality.
 ---
 
 ## Failed Attempts
-
-| Attempt | What Was Tried | Why It Failed | Lesson Learned |
-|---------|----------------|---------------|----------------|
-| Issue #1405 stale "subcommands" wording | Treat the issue's subcommand wording as the desired refactor shape | Live grep found no `add_subparsers`, `args.command`, or `COMMANDS` references in the target modules | Verify parser shape from disk; if no dispatcher exists, extract current workflow helpers rather than inventing one |
-| Issue #1405 C901-only acceptance target | Focus on dropping `# noqa: C901` from `main()` | CLI behavior is carried by JSON envelopes, dry-run semantics, fallback paths, and mocked unit-test seams | Make behavior-preservation tests first-class review targets |
-| Issue #1405 stale test ranges | Use plan-time ranges for `test_tidy.py` and `test_pr_merge.py` as if they were implementation facts | Line numbers and fixture patterns can drift; mocks can patch the wrong helper after extraction | Re-open the target tests before editing and preserve existing patch paths or intentionally update them with direct helper tests |
-| Issue #1405 planned commands treated as proof | List targeted pytest, C901, and ruff commands in the plan | Commands were not executed in the planning session; CI did not pass | Mark verification `unverified` and title the workflow as Proposed Workflow until implementation evidence exists |
 
 ### R1: Single Helper Insufficient for `_run_implementation_and_review` (130L)
 
@@ -689,13 +603,6 @@ Before submitting or approving a god-function decomposition plan:
     [ ] Read the downstream function's first 20 lines
     [ ] Confirm it handles the empty value correctly
     [ ] Cite the verification in the plan (file:line range)
-
-[ ] For GitHub CLI C901 refactors:
-    [ ] Measure the target `main()` functions from AST, not issue prose
-    [ ] Grep for the claimed command-dispatch shape before planning around it
-    [ ] Preserve JSON output envelopes and dry-run semantics explicitly
-    [ ] Add direct helper tests for extracted behavior, including negative/skip paths
-    [ ] Verify no affected `# noqa: C901` remains after implementation
 ```
 
 ---
@@ -716,7 +623,6 @@ Before submitting or approving a god-function decomposition plan:
 - Orchestrator line cap: **80 lines** (enforced via unit tests)
 - "Marginal" overage is NOT a valid waiver — any function named in the issue and over the cap is in scope
 - Valid waiver only when: measured disk size ≤ cap
-- GitHub CLI C901 threshold: `max-complexity = 12` in `pyproject.toml`; pre-commit runs `pixi run ruff check --select C901 hephaestus/`
 
 ### Copy-Paste: AST Measurement Command
 
@@ -742,25 +648,6 @@ for node in ast.walk(tree):
   = <remaining>L (target ≤ <cap>L) ✓/✗
 ```
 
-### Copy-Paste: GitHub CLI C901 Planning Checks
-
-```bash
-# Verify whether the issue's command-dispatch wording matches the live modules.
-rg -n "add_subparsers|args\\.command|COMMANDS" \
-  hephaestus/github/tidy.py hephaestus/github/pr_merge.py
-
-# Planned post-implementation verification for issue #1405.
-pixi run pytest tests/unit/github/test_tidy.py tests/unit/github/test_pr_merge.py -q
-python3 - <<'PY'
-from pathlib import Path
-for path in (Path("hephaestus/github/tidy.py"), Path("hephaestus/github/pr_merge.py")):
-    text = path.read_text()
-    assert "# noqa: C901" not in text, f"affected C901 noqa remains in {path}"
-PY
-pixi run ruff check --select C901 hephaestus/github/tidy.py hephaestus/github/pr_merge.py
-pixi run ruff check hephaestus/github/tidy.py hephaestus/github/pr_merge.py tests/unit/github/test_tidy.py tests/unit/github/test_pr_merge.py
-```
-
 ---
 
 ## Verified On
@@ -770,4 +657,4 @@ pixi run ruff check hephaestus/github/tidy.py hephaestus/github/pr_merge.py test
 | ProjectHephaestus (R0) | Planning session for issue #1180 — decompose 5 god-functions in `hephaestus/automation/`; `_implement_issue` cited as 354 lines in issue, found as 127 lines on disk; `_run_impl_review_loop` cited at `ci_driver.py:1513`, found at `_review_phase.py:374-503`; `_finalize_address_state` defined in plan but not called in replacement block; test file existence unverified; `_poll_ci_until_concluded` sentinel contract risk identified |
 | ProjectHephaestus (R1) | Second planning iteration for issue #1180 after R0 NOGO review; AST re-measurement confirmed `_implement_issue` is 128L not 354L and `_run_impl_review_loop` is at `_review_phase.py:374`; arithmetic subtraction chain revealed `_run_ci_fix_session` needs 5 helpers (not 3) to reach ≤80L; `_run_address_step_if_needed` sentinel return pattern documented with all 3 control-flow states; R0 waiver-on-"marginal" grounds rejected — 128L = 60% over cap and is in scope |
 | ProjectHephaestus | Issue #1180 R2 plan (2026-06-13) — 3rd TASK/PLAN/REVIEW cycle; all 7 target functions scoped to ≤80L |
-| ProjectHephaestus | Issue #1405 planning session (2026-06-26) — AST measured `tidy.main` as 81L and `pr_merge.main` as 99L; stale subcommand wording checked by grep; proposed helper tests and ruff/pytest verification commands were planned but not executed |
+
