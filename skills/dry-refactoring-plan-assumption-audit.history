@@ -1,3 +1,31 @@
+## v2.2.0 (2026-06-26)
+
+**Changed by:** ProjectHephaestus issue #1409 implementation-plan learning capture
+**Verification:** unverified
+
+### What changed
+
+- Extended the existing DRY refactoring planning-risk skill to cover shared validation CLI parser extraction.
+- Added `argparse` parser-factory assumptions around a private `ArgumentParser` subclass, `parse_args()` override behavior, and `parse_known_args()` consumers.
+- Added reviewer-focus guidance for current-head CLI inventory drift, barrel export checks, dual CLI entrypoints, duplicate/missing `--json` and `--version` registration, and fallback `get_repo_root()` running on help/version/error paths.
+- Added Issue #1409 findings to Results & Parameters with explicit "unverified in this learn step" status.
+
+### Why
+
+The implementation plan for ProjectHephaestus issue #1409 relies on several assumptions that are easy for
+a reviewer to miss because the planned change looks like a small DRY refactor. The durable learning is not
+the implementation recipe itself; it is the review checklist for the most uncertain assumptions: which
+files and APIs were relied on without direct re-verification, which CLI parser paths need runtime tests,
+and where structural tests can give false confidence.
+
+### Previous version (v2.1.0) snapshot
+
+The previous version captured ProjectHephaestus issue #1189 DRY module-consolidation risks and R2 findings
+for TOML section regex behavior and wrong test-count claims. The full v2.1.0 body is preserved in git
+history immediately before this amendment.
+
+---
+
 ---
 name: dry-refactoring-plan-assumption-audit
 description: "Checklist of hidden assumptions that bite DRY module-consolidation plans before implementation starts. Use when: (1) planning to merge two modules into one canonical, (2) replacing a module with a delegation shim that re-exports from the canonical, (3) porting tests from one file to another, (4) extending a main() function with new sub-checks, (5) consolidating two functions with the same name but different signatures."
