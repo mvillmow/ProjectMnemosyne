@@ -1,5 +1,47 @@
 # verify-issue-premise-against-code-before-planning — History
 
+## v1.2.0 (2026-06-26)
+
+**Changed by:** ProjectHephaestus issue #1400 implementation-plan learning. The plan's objective
+was to ensure GitHub CLI invocations in `hephaestus/github/fleet_sync.py` and
+`hephaestus/github/severity_label.py` route through `hephaestus.github.client.gh_call`, but the
+plan treated the issue's raw-`gh` call count, cited source lines, and existing-test expectations as
+stale planning evidence rather than ground truth.
+**Verification:** unverified — PLANNING session only. No code was changed and no targeted tests,
+pre-commit hooks, or CI were run at planning time.
+
+### What changed
+
+- Added the wrapper-migration variant of the same premise-verification lesson: when an issue reports
+  raw CLI call counts, grep the current source before scoping because the wrappers may already exist.
+- Added guidance to separate true GitHub CLI calls from unrelated local subprocesses such as `git`
+  and `gpg`.
+- Added reviewer-risk guidance for preserving wrapper contracts: repo/org argument prepending,
+  `check=True`, stdout/return-shape semantics, and dry-run no-network behavior.
+- Added AST-regression-guard limitations: literal `subprocess.run(["gh", ...])` guards do not catch
+  aliases, imported `run`, `Popen`, shell strings, helper indirection, or variable-built commands.
+- Added ProjectHephaestus #1400 residual assumptions under Results & Parameters and a Verified On
+  row marking the learning as planning-only / unverified.
+- Frontmatter: bumped `version` 1.1.0 → 1.2.0, updated `date`, and added tags for `gh-call`,
+  `github-cli`, `subprocess`, `ast-regression-guard`, `wrapper-semantics`, and `dry-run`.
+
+### Why
+
+The ProjectHephaestus #1400 plan surfaced a durable planning-risk pattern that is broader than the
+specific `gh_call` issue: source evidence in an issue can be stale, especially around wrapper
+migrations where prior work may have already replaced the raw calls. A reviewer should focus on
+whether the plan preserves behavior and scopes exclusions correctly, not just whether it removes
+every apparent `subprocess.run` call.
+
+### Previous version (v1.1.0) snapshot
+
+The previous version is the v1.1.0 skill content in the parent commit of this amendment. It covered
+the ProjectAgamemnon #248 planning lessons: verify issue-premise tokens against current code,
+enumerate all matching sites before scoping, ratify excluded look-alikes, and account for per-site
+divergence.
+
+---
+
 ## v1.1.0 (2026-06-19)
 
 **Changed by:** ProjectAgamemnon issue #248 planning session (revision after a NOGO). The FIRST

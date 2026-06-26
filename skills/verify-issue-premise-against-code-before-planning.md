@@ -1,9 +1,9 @@
 ---
 name: verify-issue-premise-against-code-before-planning
-description: "An issue body that asserts 'the current code does X' is a CLAIM, not ground truth — before writing a plan, grep the repo for the distinctive tokens in the issue's premise and confirm WHICH file/job actually matches, and ENUMERATE EVERY site that matches before scoping. Issues drift from code; follow-up issues especially describe a since-changed state, and CI/workflow issues are dangerous because the same step pattern appears in several workflow files AND in several jobs of one file. In ProjectAgamemnon #248 the premise said the repo used `setup-pixi` with `cache: false` skipping built-in save; grepping `cache: false` (the issue's OWN premise token) showed the scenario lived in TWO jobs of `_required.yml` (`lint` AND `pixi-check`), plus a look-alike `security-dependency-scan` with a DIFFERENT defect. A first plan that grepped the INCIDENTAL token `pixi install --locked` (which the issue never named) matched only `pixi-check`, silently dropped `lint`, and earned a NOGO. Use when: (1) planning any issue whose description asserts current code structure/config, (2) the issue is a follow-up to a prior issue, (3) CI/workflow issues where similar steps appear in multiple workflow files OR multiple jobs, (4) the premise tokens may have already been fixed, (5) the issue fixes a recurring code pattern likely present in more than one place — especially after a single-site plan or when a sibling/look-alike site exists."
+description: "An issue body that asserts 'the current code does X' is a CLAIM, not ground truth — before writing a plan, grep the repo for the distinctive tokens in the issue's premise and confirm WHICH file/job actually matches, and ENUMERATE EVERY site that matches before scoping. Issues drift from code; follow-up issues especially describe a since-changed state, and CI/workflow issues are dangerous because the same step pattern appears in several workflow files AND in several jobs of one file. In ProjectAgamemnon #248 the premise said the repo used `setup-pixi` with `cache: false` skipping built-in save; grepping `cache: false` (the issue's OWN premise token) showed the scenario lived in TWO jobs of `_required.yml` (`lint` AND `pixi-check`), plus a look-alike `security-dependency-scan` with a DIFFERENT defect. A first plan that grepped the INCIDENTAL token `pixi install --locked` (which the issue never named) matched only `pixi-check`, silently dropped `lint`, and earned a NOGO. In ProjectHephaestus #1400, a raw-`gh` call count was treated as stale until the current source could prove whether `fleet_sync.py` and `severity_label.py` already routed through `gh_call`; the reviewer risks were wrapper semantics, dry-run behavior, non-`gh` subprocess exclusions, and AST guard blind spots. Use when: (1) planning any issue whose description asserts current code structure/config, (2) the issue is a follow-up to a prior issue, (3) CI/workflow issues where similar steps appear in multiple workflow files OR multiple jobs, (4) the premise tokens may have already been fixed, (5) the issue fixes a recurring code pattern likely present in more than one place — especially after a single-site plan or when a sibling/look-alike site exists, (6) planning wrapper/migration work where raw-call counts, line numbers, or guard coverage may be stale."
 category: documentation
-date: 2026-06-19
-version: "1.1.0"
+date: 2026-06-26
+version: "1.2.0"
 history: verify-issue-premise-against-code-before-planning.history
 user-invocable: false
 verification: unverified
@@ -25,6 +25,12 @@ tags:
   - under-scoping
   - self-fulfilling-narrowing
   - multi-site
+  - gh-call
+  - github-cli
+  - subprocess
+  - ast-regression-guard
+  - wrapper-semantics
+  - dry-run
 ---
 
 # Verify the Issue Premise Against the Code Before Planning
@@ -33,10 +39,10 @@ tags:
 
 | Field | Value |
 |-------|-------|
-| **Date** | 2026-06-19 |
+| **Date** | 2026-06-26 |
 | **Objective** | Capture a durable planning-discipline lesson: an issue's description of "what the current code does" is a CLAIM to verify against the actual files, not ground truth to plan on — grep the distinctive premise tokens to confirm WHICH file/job actually matches, AND enumerate EVERY site that matches the premise before scoping, ratifying in-scope and excluded sites explicitly |
-| **Outcome** | Plan written for ProjectAgamemnon #248 ("Add pixi.lock restore-only cache fallback on miss"). **(v1.0.0)** The premise implied `python-client.yml`, but those jobs use the full `actions/cache@v4` (auto-saves) — grepping the premise tokens disambiguated `_required.yml`. **(v1.1.0)** The FIRST revision of that plan fixed only ONE job (`pixi-check`) and got a NOGO: grepping the incidental token `pixi install --locked` (which the issue never named) silently dropped a SECOND matching job, `lint`. Grepping the issue's OWN premise token `cache: false` enumerated BOTH `lint` + `pixi-check` as in-scope and surfaced a look-alike `security-dependency-scan` (different defect) to ratify as out-of-scope |
-| **Verification** | unverified — PLANNING session only; neither the disambiguation plan nor the enumerate-and-ratify revision was implemented or run through CI, and the proposed `actions/cache/restore@v5` + `actions/cache/save@v5` split was not executed end-to-end |
+| **Outcome** | Plan written for ProjectAgamemnon #248 ("Add pixi.lock restore-only cache fallback on miss"). **(v1.0.0)** The premise implied `python-client.yml`, but those jobs use the full `actions/cache@v4` (auto-saves) — grepping the premise tokens disambiguated `_required.yml`. **(v1.1.0)** The FIRST revision of that plan fixed only ONE job (`pixi-check`) and got a NOGO: grepping the incidental token `pixi install --locked` (which the issue never named) silently dropped a SECOND matching job, `lint`. Grepping the issue's OWN premise token `cache: false` enumerated BOTH `lint` + `pixi-check` as in-scope and surfaced a look-alike `security-dependency-scan` (different defect) to ratify as out-of-scope. **(v1.2.0)** A ProjectHephaestus #1400 plan treated the issue's raw `gh` call count as stale and scoped the work around current wrapper behavior: preserve `_gh` delegation to `gh_call`, preserve dry-run no-network behavior, leave `git`/`gpg` subprocesses alone, and make AST guard limitations explicit |
+| **Verification** | unverified — PLANNING session only; neither the cache plans nor the ProjectHephaestus #1400 `gh_call` wrapper-regression plan were implemented or run through CI |
 
 This is a planning-DISCIPLINE learning, distinct from the cache-mechanics skill
 `pixi-cache-true-unreliable`. The lesson is not "how cache syntax works" — it is "do not
@@ -49,6 +55,12 @@ premise matches — fix every in-scope one and ratify every excluded look-alike.
 failure modes are different: wrong-file (disambiguate) vs under-scoping / silently-dropped
 sibling (enumerate-and-ratify). Both share one root: grep the issue's OWN premise token, not
 an incidental token from your first-found site.
+
+**v1.2.0 adds the wrapper-migration variant.** When an issue says "there are raw CLI calls to
+route through a shared wrapper," the call count, cited line numbers, and "bare call" evidence are
+a stale-premise risk. Grep the current code for the actual call surface, separate true target CLI
+calls from local `git` / `gpg` subprocesses, and make tests preserve wrapper semantics rather than
+only proving a mock was invoked.
 
 > **Warning:** This workflow has not been validated end-to-end. Treat as a hypothesis until
 > CI confirms.
@@ -71,6 +83,12 @@ an incidental token from your first-found site.
   more than ONE place. Especially after you have already written a SINGLE-site plan, and
   especially when a sibling or look-alike site exists in the same file/dir. The choice of which
   sites to fix is a scope DECISION the reviewer must ratify; enumerate them all first.
+- **(v1.2.0)** Planning wrapper or subprocess migrations where an issue reports a count of raw
+  CLI invocations, e.g. "replace bare `gh` calls with `gh_call`." Verify the count against
+  current source before scoping, and distinguish target CLI calls from unrelated local commands.
+- **(v1.2.0)** Planning regression guards based on AST/static analysis. State exactly what the
+  guard catches and what it misses: literal calls, aliases, variables, shell strings, helper
+  indirection, `Popen`, dynamic command construction, and similar bypasses.
 
 ## Verified Workflow
 
@@ -121,6 +139,19 @@ grep -rn 'cache: false' .github/workflows/_required.yml   # the issue's premise 
 #      lint  uses cache key `pixi-lint-*` and path clients/python/.pixi
 #      pixi-check uses cache key `pixi-*` and a different path
 #    A uniform save would write under a key the restore never looks up -> silent cache miss.
+
+# 6. (v1.2.0) For CLI-wrapper migrations, audit the CURRENT call surface before accepting
+#    a stale issue count. Separate true target CLI calls from unrelated local commands.
+rg -n 'subprocess\.(run|Popen)|gh_call|def _gh' hephaestus/github/fleet_sync.py \
+  hephaestus/github/severity_label.py
+rg -n "subprocess\.run\(\s*\[\s*['\"]gh['\"]" hephaestus/github/fleet_sync.py \
+  hephaestus/github/severity_label.py
+
+#    Then lock wrapper behavior, not just the existence of a mock:
+#      - _gh(["pr", "list"], repo="R", org="O") prepends ["--repo", "O/R", ...]
+#      - dry_run returns a synthetic CompletedProcess and never calls gh_call
+#      - severity_label._gh(*args) passes list(args), check=True, and returns stdout
+#      - local git/gpg subprocesses remain local subprocesses, not gh_call calls
 ```
 
 ### Detailed Steps
@@ -183,6 +214,30 @@ grep -rn 'cache: false' .github/workflows/_required.yml   # the issue's premise 
    cache miss. Inspect each in-scope site's specifics and fit the fix to each, rather than
    templating one site's parameters across all.
 
+10. **(v1.2.0) For wrapper migrations, verify the live call surface before trusting a raw-call
+    count.** In ProjectHephaestus #1400, the plan treated the issue's raw `gh` call count as stale:
+    current source already showed `_gh` helpers delegating through `gh_call`. That changes the
+    implementation from "migrate production calls" to "update stale tests and add guards." Before
+    writing a files-to-modify list, grep both the target modules and tests for `subprocess.run`,
+    `gh_call`, and local helpers.
+
+11. **(v1.2.0) Preserve wrapper semantics as behavior, not incidental implementation.** Tests for
+    a local `_gh` wrapper should assert the arguments, `check=` behavior, stdout return shape, and
+    dry-run/no-network behavior the wrapper promises. A test that only mocks `gh_call` can pass
+    while silently changing repo/org argument prepending or returning a `CompletedProcess` where
+    callers expect `stdout`.
+
+12. **(v1.2.0) Scope non-target subprocesses explicitly.** Shared GitHub CLI retry/throttle
+    wrappers apply to `gh`, not to local `git` or `gpg` subprocesses. The plan should list those
+    calls as deliberately out of scope so a reviewer does not mistake the omission for a missed
+    migration.
+
+13. **(v1.2.0) Treat AST guards as bounded defense-in-depth.** A guard for literal
+    `subprocess.run(["gh", ...])` is useful as a regression tripwire, but it does not catch aliases,
+    imported `run`, `subprocess.Popen`, `shell=True` strings, variables, helper indirection, or
+    dynamic command construction. Put those blind spots in reviewer risks, and use grep/manual
+    audit or broader static checks if the issue requires stronger coverage.
+
 ## Failed Attempts
 
 | Attempt | What Was Tried | Why It Failed | Lesson Learned |
@@ -192,6 +247,10 @@ grep -rn 'cache: false' .github/workflows/_required.yml   # the issue's premise 
 | **(v1.1.0)** Scoped the fix by grepping `pixi install --locked` | Assumed that token defined the issue's target job | It's incidental to ONE job; the issue's real premise token is `cache: false`, which also matched the `lint` job — silently dropped → NOGO | Grep the issue's OWN premise token, not a distinctive token from your first-found site |
 | **(v1.1.0)** Fixed only the first matching job and didn't mention the others | Treated single-site as obviously-complete | Reviewer reads a dropped matching sibling as an oversight; ambiguous scope must be surfaced, not silently resolved | Enumerate all sites; ratify which are in/out of scope with reasons |
 | **(v1.1.0)** Considered treating all pixi-cache jobs uniformly | Would have copied one job's cache key to all | `lint` and `pixi-check` use DIFFERENT keys (`pixi-lint-*` vs `pixi-*`) and paths; a uniform save would write under a key the restore never looks up | Check per-site divergence before applying a templated fix |
+| **(v1.2.0)** Trust the issue's raw `gh` call count | Planned from the issue's reported count without treating it as stale | Current source may already route target helpers through `gh_call`, changing the work from production migration to stale-test/guard updates | Grep current source first; call counts and cited line numbers are a snapshot |
+| **(v1.2.0)** Migrate every `subprocess.run` in the target files | Treat local `git` and `gpg` invocations as if they were GitHub CLI calls | `gh_call` owns GitHub CLI resilience; local VCS/signing subprocesses have different semantics and should stay local unless a separate issue says otherwise | Scope by command head, not by API name alone |
+| **(v1.2.0)** Write a guard that only catches literal lists and present it as complete | AST check looked only for `subprocess.run(["gh", ...])` | Aliases, variables, `Popen`, helper wrappers, shell strings, and dynamic commands bypass that guard | Describe the guard's coverage and blind spots in the plan and review checklist |
+| **(v1.2.0)** Test only that `_gh` calls `gh_call` | Mocked the shared adapter but did not assert wrapper arguments or no-network dry-run behavior | A refactor could break repo/org prepending, `check=True`, stdout return shape, or dry-run without failing a shallow mock test | Assert the wrapper contract that callers depend on, not just an internal call count |
 
 ## Results & Parameters
 
@@ -243,6 +302,31 @@ jobs (`lint`, `pixi-check`) plus one ratified exclusion. The residual uncertaint
   follow-up (different defect: built-in setup-pixi caching active, no `cache:` key). Confirm that
   deferral is intended for #248.
 
+### (v1.2.0) ProjectHephaestus #1400 residuals for the reviewer
+
+The plan objective was to ensure every GitHub CLI invocation in
+`hephaestus/github/fleet_sync.py` and `hephaestus/github/severity_label.py` routes through
+`hephaestus.github.client.gh_call`, so the shared circuit breaker, throttle, rate-limit retry,
+and error handling path applies. The plan itself was not executed; it only audited source and
+proposed tests.
+
+- **STALE-PREMISE RISK:** the issue's raw `gh` call count may be stale. The plan cited current
+  wrappers in `fleet_sync.py` and `severity_label.py`, but those line numbers can drift before
+  implementation.
+- **UNVERIFIED SOURCE RELIANCE:** the plan relied on source snippets from `fleet_sync.py`,
+  `severity_label.py`, `tests/unit/github/test_fleet_sync.py`, `tests/unit/github/test_severity_label.py`,
+  and `hephaestus.github.client.gh_call` without running the tests or CI.
+- **WRAPPER-CONTRACT RISK:** `fleet_sync._gh` must preserve repo/org argument prepending,
+  `check=True` defaults, return type, and dry-run synthetic `CompletedProcess` behavior. The
+  severity-label helper must preserve `list(args)`, `check=True`, and stdout return semantics.
+- **SCOPE RISK:** local `git` / `gpg` subprocesses in `fleet_sync.py` are not GitHub CLI calls and
+  should not be migrated to `gh_call` as part of a GitHub CLI resilience issue.
+- **GUARD-COVERAGE RISK:** an AST regression guard for literal `subprocess.run(["gh", ...])` is
+  useful but intentionally incomplete; aliases, imported `run`, `subprocess.Popen`, shell strings,
+  helper indirection, and variable-built commands require separate audit if they are in scope.
+- **TOOLING RISK:** pytest, pixi, pre-commit, and GitHub CLI semantics were assumed from repository
+  conventions. The reviewer should confirm the targeted commands and pre-commit hooks actually run.
+
 ### Related skills
 
 - `pixi-cache-true-unreliable` — the cache-MECHANICS skill (when `cache: true` / built-in save is
@@ -253,9 +337,12 @@ jobs (`lint`, `pixi-check`) plus one ratified exclusion. The residual uncertaint
 - `planning-verify-issue-premise-before-implementing` — verify an issue-named ARTIFACT exists
   (repo-wide, across branches) before concluding it was never built. THIS skill instead
   disambiguates WHICH same-repo file/job a premise's tokens actually match.
+- `dry-refactoring-workflow` — complementary for behavior-preserving wrapper/DRY refactors; this
+  skill contributes the planning-time stale-evidence and reviewer-risk checklist.
 
 ## Verified On
 
 | Project | Context | Details |
 |---------|---------|---------|
 | ProjectAgamemnon | Issue #248 ("Add pixi.lock restore-only cache fallback on miss") — a follow-up from #62 | unverified — planning session only. The premise implied `python-client.yml`, but grepping `cache: false` + `pixi install --locked` resolved the described scenario to `_required.yml` job `pixi-check`. Plan proposes splitting that job's single restore-only `actions/cache@v5` into `actions/cache/restore@v5` + a guarded `actions/cache/save@v5` after `pixi install --locked`. Not implemented or CI-run. |
+| ProjectHephaestus | Issue #1400 — plan to route GitHub CLI invocations in `fleet_sync.py` and `severity_label.py` through `gh_call` | unverified — planning session only. Source was audited but no code, targeted tests, pre-commit, or CI were run at planning time. Reviewer focus: stale raw-call count, wrapper contract, dry-run behavior, non-`gh` subprocess exclusion, AST guard limitations, and command availability. |
