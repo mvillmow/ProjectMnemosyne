@@ -1,10 +1,34 @@
+# hephaestus-automation-loop-branch-sync-drive-green - History
+
+## v1.1.0 (2026-06-29)
+
+**Changed by:** ProjectHephaestus PR #1633 / issue #1405 drive-green recovery.
+**Verification:** verified-ci
+
+### What changed
+- Added the PR #1633 failure mode where a CI-fix session advanced HEAD but left tracked residual changes dirty, making the PR unsafe or impossible to push.
+- Added the sessionless existing-PR conflict recovery rule: direct agents may start a fresh implementation session when there is no saved implementer session id.
+- Added residual commit rules for tracked-path allowlists, refusing unmerged status codes, staging deleted tracked files with `git add -u`, and avoiding broad residual staging.
+- Added the strict-mypy implementation trap: explicit calls are required instead of dynamic `**kwargs` when forwarding optional `allowed_paths`.
+- Added PR #1633 / issue #1405 to Results & Parameters and Verified On.
+
+### Why
+ProjectHephaestus PR #1633 was not blocked only by the original C901 refactor. The drive-green
+path exposed automation reliability bugs: conflicted existing PRs could dead-end without a saved
+session, CI-fix agent turns could leave residual tracked work uncommitted after making a commit,
+and the typed commit-helper wrapper needed a mypy-visible branch for `allowed_paths`. Capturing
+these under the existing automation-loop drive-green skill keeps the learning with the workflow
+that operators will search when a PR appears fixed locally but cannot be pushed or merged.
+
+### Previous version (v1.0.0) snapshot
+
+````markdown
 ---
 name: hephaestus-automation-loop-branch-sync-drive-green
-description: "Diagnose and fix ProjectHephaestus automation-loop completion failures by enforcing fresh branch/worktree sync before implementation, limiting each worker's drive-green scope to its owned issue/PR, running a final catch-all drive-green pass, and committing residual CI-fix changes safely before push. Use when: (1) automation loops leave planned issues or PRs unfinished, (2) existing issue worktrees or branches are reused across runs, (3) drive-green acts on unrelated PRs, (4) Codex-authored commits must satisfy signed and Signed-off-by policy gates, (5) a CI-fix agent advances HEAD but leaves tracked residual changes that make the PR unpushable, (6) an existing conflicted PR has no saved implementer session to resume."
+description: "Diagnose and fix ProjectHephaestus automation-loop completion failures by enforcing fresh branch/worktree sync before implementation, limiting each worker's drive-green scope to its owned issue/PR, and running a final catch-all drive-green pass. Use when: (1) automation loops leave planned issues or PRs unfinished, (2) existing issue worktrees or branches are reused across runs, (3) drive-green acts on unrelated PRs, (4) Codex-authored commits must satisfy signed and Signed-off-by policy gates."
 category: tooling
-date: 2026-06-29
-version: "1.1.0"
-history: hephaestus-automation-loop-branch-sync-drive-green.history
+date: 2026-06-26
+version: "1.0.0"
 user-invocable: false
 verification: verified-ci
 tags:
@@ -17,11 +41,6 @@ tags:
   - signed-commits
   - dco
   - pr-scope
-  - ci-fix
-  - residual-changes
-  - allowed-paths
-  - merge-conflict
-  - mypy
 ---
 
 # Hephaestus Automation Loop Branch Sync and Drive-Green Scope
@@ -30,11 +49,10 @@ tags:
 
 | Field | Value |
 |-------|-------|
-| **Date** | 2026-06-29 |
-| **Objective** | Make automation-loop workers finish their owned issue/PR reliably instead of reusing stale branches, ignoring review/comment state, letting broad drive-green phases act on unrelated PRs, or treating a CI-fix commit as pushable while tracked residual changes remain dirty. |
-| **Outcome** | Fixed in ProjectHephaestus PR #1646 for issue #1645, then extended by the PR #1633 / issue #1405 drive-green recovery: existing conflicted PRs without saved sessions can start a fresh direct-agent pass, CI-fix residuals are committed before push with tracked-path allowlists, deleted tracked files stage through `git add -u`, and strict mypy accepts the explicit commit-helper call shape. |
+| **Date** | 2026-06-26 |
+| **Objective** | Make automation-loop workers finish their owned issue/PR reliably instead of reusing stale branches, ignoring review/comment state, or letting broad drive-green phases act on unrelated PRs. |
+| **Outcome** | Fixed in ProjectHephaestus PR #1646 for issue #1645. The PR merged on 2026-06-26 after required CI passed. |
 | **Verification** | verified-ci |
-| **History** | [changelog](./hephaestus-automation-loop-branch-sync-drive-green.history) |
 
 ## When to Use
 
@@ -44,9 +62,6 @@ tags:
 - A drive-green phase is scoped by intent to one issue/PR but logs or touches unrelated open PRs.
 - A final status sweep shows green-but-unarmed, stale, or review-blocked PRs after per-worker phases finish.
 - Codex is the selected agent and commits must satisfy both signed-commit and `Signed-off-by` policy checks.
-- A CI-fix agent returns after creating a commit, but `git status --porcelain` still shows tracked modifications, `MM` files, tracked deletions, or relevant untracked files that make the branch unsafe or impossible to push.
-- A conflicted existing PR has no saved implementer session id; the conflict gate should launch a fresh direct-agent implementation session instead of marking the PR not-GO forever.
-- A residual-commit helper needs to pass an exact path allowlist through strict mypy; avoid dynamic `**kwargs` around optional `allowed_paths`.
 
 ## Verified Workflow
 
@@ -73,11 +88,6 @@ hephaestus-merge-prs --agent <agent>
 # 5. Verify commit policy before pushing or arming auto-merge:
 git log origin/main..HEAD --pretty=format:'%h %G? %s'
 git log origin/main..HEAD --format=%B | grep -q '^Signed-off-by: '
-
-# 6. After a CI-fix agent run, do not treat HEAD advancement as sufficient:
-git -C <issue-worktree> status --porcelain
-# If tracked residuals remain, commit only those tracked paths before push.
-# Refuse unmerged U* statuses; they are unresolved conflicts, not residual work.
 ```
 
 ### Detailed Steps
@@ -96,22 +106,6 @@ git -C <issue-worktree> status --porcelain
 
 7. **Use live GitHub state as the completion gate.** Before reporting the loop complete, check the issue state, PR state, required checks, review/thread state, and auto-merge state live from GitHub. Local success logs are not enough.
 
-8. **For existing conflicted PRs, do not require a saved implementer session.** Existing-PR review can start from GitHub state without a persisted transcript. If a mechanical rebase still leaves `DIRTY` or `CONFLICTING`, dispatch the implementation agent with explicit conflict-resolution instructions. For direct runners, `session_id=None` should call the fresh session path; a missing session id is not a reason to strand the PR.
-
-9. **After a CI-fix agent advances HEAD, re-check pushability.** Head advancement proves only that a commit exists. It does not prove the worktree is clean. If push-safety checks find tracked residuals, commit those residuals before push. Refuse unresolved unmerged status codes such as `UU`, `AA`, `AU`, `UD`, `DU`, and `DD`.
-
-10. **Scope residual commits to tracked paths from porcelain.** Convert `git status --porcelain` lines to exact tracked paths, ignore `??` untracked entries for the residual commit, and pass the tuple as `allowed_paths` to the shared commit helper. This prevents logs, caches, or unrelated artifacts from entering the fix commit while still preserving legitimate resolved tracked files.
-
-11. **Stage tracked deletions with `git add -u -- <path>`.** A deleted tracked file is part of the index update, not an untracked file to add. Commit helpers should route deletion-only pathsets through `git add -u` so deletions are staged without sweeping unrelated files.
-
-12. **Keep strict typing explicit around optional allowed paths.** In mypy-strict code, do not build a dynamic kwargs dict and splat it into `commit_changes`. Branch explicitly:
-   ```python
-   if allowed_paths is None:
-       commit_changes(issue_number, worktree_path, agent)
-   else:
-       commit_changes(issue_number, worktree_path, agent, allowed_paths=allowed_paths)
-   ```
-
 ## Failed Attempts
 
 | Attempt | What Was Tried | Why It Failed | Lesson Learned |
@@ -121,10 +115,6 @@ git -C <issue-worktree> status --porcelain
 | Preserving stale local commits instead of rebasing | Existing local branch commits were treated as work to preserve because their subjects looked relevant. | Stale branches can be based on old main, miss required files or comments, or carry partial/revert-shaped changes. | Rebase onto `origin/main` before implementation; inspect the post-rebase diff and live PR state before deciding what to keep. |
 | Fake or local-only substitutes for externally required tools | Local stand-ins were used for checks that the real external workflow or policy gate would enforce. | The local result did not prove the automation path would pass required CI, signing, review, or GitHub policy gates. | Use the real tool path for required external gates, or mark the result unverified. For this workflow, rely on required CI and live PR evidence. |
 | Codex commits without explicit policy verification | Codex-generated commits were allowed to proceed without checking both cryptographic signature state and `Signed-off-by` trailers. | Required policy checks can reject commits even when the code and tests are correct. | Verify `git log origin/main..HEAD --pretty=format:'%h %G? %s'` and scan commit bodies for `Signed-off-by:` before push/auto-merge. |
-| Treating HEAD advancement as pushable success | The CI-fix session created a commit, so the driver proceeded as though the PR branch was ready to push. | The worktree still had tracked residual changes from the fix turn; pushing without committing them would either fail the push-safety guard or leave the actual fix incomplete. | After every CI-fix agent turn, check both head advancement and clean/pushable state. Commit resolved tracked residuals before pushing. |
-| Committing residuals with broad staging | Residual cleanup considered committing whatever was dirty after the CI-fix turn. | Relevant untracked files and unrelated artifacts can be present in automation worktrees; broad staging risks polluting the PR with logs, caches, or sibling work. | Derive exact tracked paths from `git status --porcelain`, skip `??`, and pass `allowed_paths` into the commit helper. |
-| Dead-ending conflicted existing PRs without a session id | The conflict gate required a saved implementer session to resume. | Existing PRs can be discovered without a stored transcript; after mechanical rebase fails, returning not-GO leaves the PR conflicted and unreviewable. | For direct agents, allow `session_id=None` to start a fresh implementation session with the conflict-resolution prompt. |
-| Dynamic kwargs around optional `allowed_paths` | Built a dict and splatted `**commit_kwargs` into `commit_changes`. | Strict mypy could not verify the branch-specific call shape. | Use explicit `if allowed_paths is None` / `else` calls so mypy sees the allowed signature in both branches. |
 
 ## Results & Parameters
 
@@ -136,21 +126,6 @@ git -C <issue-worktree> status --porcelain
 - Required Checks run: 28256238895 succeeded.
 - Test workflow run: 28256151963 succeeded.
 - Squash merge commit: `2a0cd2adc2570264c1bd2c45df96c75246bac433`.
-
-### ProjectHephaestus PR #1633 / issue #1405 drive-green details
-
-- The original issue targeted C901 refactoring in `hephaestus/github/tidy.py` and `hephaestus/github/pr_merge.py`.
-- The PR later failed during drive-green because the automation path itself needed hardening:
-  - existing conflicted PRs without a saved implementer session had no fresh direct-agent path;
-  - CI-fix sessions could advance HEAD but leave tracked residual changes dirty;
-  - residual commits needed path allowlisting so only tracked files from the fix turn were staged;
-  - deleted tracked files needed `git add -u`;
-  - strict mypy rejected dynamic kwargs around the optional `allowed_paths` branch.
-- The fix commits in the PR were:
-  - `ad40ecd` - recover stalled loop PRs;
-  - `4a9863b` - harden residual CI fix commits;
-  - `2d902bb` - satisfy mypy for residual commit helper.
-- The result was green CI for ProjectHephaestus PR #1633.
 
 ### Completion Checklist
 
@@ -189,4 +164,10 @@ git log origin/main..HEAD --format=%B | grep -q '^Signed-off-by: '
 | Project | Context | Details |
 |---------|---------|---------|
 | ProjectHephaestus | Issue #1645 / PR #1646 | verified-ci; Required Checks run 28256238895 succeeded; Test workflow run 28256151963 succeeded; merged 2026-06-26 as `2a0cd2adc2570264c1bd2c45df96c75246bac433` |
-| ProjectHephaestus | Issue #1405 / PR #1633 | verified-ci; drive-green recovery required fresh direct-agent conflict resolution for sessionless existing PRs, residual tracked CI-fix commits with `allowed_paths`, `git add -u` for deleted tracked files, and explicit mypy-friendly commit-helper calls. |
+````
+
+---
+
+## v1.0.0 (2026-06-26)
+
+**Initial version.**
