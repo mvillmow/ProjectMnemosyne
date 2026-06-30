@@ -1,5 +1,25 @@
 # Changelog: audit-remediation-verify-evidence-before-planning
 
+## v1.4.0 -> v1.5.0 (2026-06-30)
+
+- **Version:** 1.4.0 -> 1.5.0 (MINOR — adds new plan-only findings/failed-attempts for stale audit ghost scaffolding and ignored-file guard semantics, not a rewrite)
+- **Date:** 2026-06-30
+- **Changed by:** ProjectHephaestus issue #1468 implementation-plan learning capture (stale audit paths for removed tooling; direct test-dir phantom detector risk)
+- **Verification level:** UNVERIFIED — PLAN ONLY. The implementation workflow was not executed end-to-end, tests for the proposed fix were not run, and CI was not observed. The main skill frontmatter remains `verified-local` because earlier core evidence-verification content is genuinely verified-local; this v1.5.0 addition is explicitly labeled `unverified` inline.
+- **Snapshot reference:** v1.4.0 rendered `.md` preserved in git history at the parent commit of this amendment (frontmatter `version: "1.4.0"`, `date: 2026-06-26`; Overview carried v1.1.0/v1.2.0/v1.3.0/v1.4.0 notes; workflow included the v1.3.0 plan-only section and quick-reference blocks through the predecessor-artifact-never-landed case; Failed Attempts had 19 rows; Results & Parameters covered canonical mapping, #1553, #1506, and #1507).
+- **What changed:**
+  - Extended the description with the ghost-scaffolding lesson: cited source/test dirs for removed tooling must be rechecked as live/tracked/ignored artifacts before restoring any package; ignored-file semantics can hide bytecode-only test skeletons unless a direct test-directory guard walks them.
+  - Added a `v1.5.0 note (UNVERIFIED — plan only; ghost-scaffolding and ignored-file-semantics case)` to the Overview for #1468.
+  - Added three "When to Use" triggers covering removed-tooling path citations, ignored/no-source filtering in mirror helpers, and unverified plan dependencies such as line numbers/docs/hooks/console scripts/helper behavior.
+  - Added a `Proposed Workflow (v1.5.0 — UNVERIFIED, plan only)` subsection with the required warning, covering path/tracked-artifact rechecks, policy verification before restoring deleted tooling, ignored-file semantics, direct test-dir phantom detection, non-vacuous regression tests, and reviewer assumption labeling.
+  - Added a ghost-scaffolding quick-reference block for `find`, `git ls-files`, ignore-rule checks, policy-doc grep, helper/filter grep, and proposed guard/pre-commit verification commands.
+  - Added four Failed Attempts rows tagged `(v1.5.0, UNVERIFIED)`: restoring deleted tooling from stale citations; trusting plan-time absence assumptions; relying on mirror-set helpers to catch bytecode-only test skeletons; and treating unverified integration points as facts.
+  - Added a ProjectHephaestus #1468 Results & Parameters block with the objective, pre-edit rechecks, proposed fix shape, reviewer focus areas, and plan-prescribed verification commands.
+- **Why:**
+  - Planning #1468 surfaced a specific stale-audit trap: the issue's cited source/test paths should be treated as possible ghost scaffolding from removed tooling, not as a mandate to recreate the removed package. The most important uncertainty is not the cleanup itself but the guard's blind spot: helpers that intentionally filter ignored/no-source directories can hide `tests/unit/<name>/` directories containing only `__pycache__`/`.pyc`. The durable lesson is to re-check live paths, tracked artifacts, ignore rules, and policy docs at implementation time; preserve existing source-side guards; and add a direct test-dir phantom detector when ignored-file semantics are the risk.
+
+---
+
 ## v1.3.0 -> v1.4.0 (2026-06-26)
 
 - **Version:** 1.3.0 -> 1.4.0 (MINOR — adds new findings/failed-attempts for the #1507 follow-on, not a rewrite)
