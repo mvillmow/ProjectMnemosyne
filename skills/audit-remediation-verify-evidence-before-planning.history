@@ -1,5 +1,26 @@
 # Changelog: audit-remediation-verify-evidence-before-planning
 
+## v1.4.0 -> v1.5.0 (2026-06-30)
+
+- **Version:** 1.4.0 -> 1.5.0 (MINOR — adds new findings/failed-attempts for the #1449 coupled-count-vs-listing shape, not a rewrite)
+- **Date:** 2026-06-30
+- **Changed by:** ProjectHephaestus issue #1449 ("CLAUDE.md subpackage inventory: count says 20, listing shows 19 — both wrong") planning
+- **Verification level:** UNVERIFIED — PLAN ONLY. No code executed, no tests run, no CI. The frontmatter `verification` field stays at `verified-local` because the pre-existing v1.0.0–v1.2.0 evidence-verification content remains genuinely verified-local; the v1.3.0/v1.4.0/v1.5.0 additions are `unverified` and labeled as such inline.
+- **Snapshot reference:** v1.4.0 rendered `.md` preserved in git history at the parent commit of this amendment (frontmatter `version: "1.4.0"`, `date: 2026-06-26`, `verification: verified-local`; Overview carried the v1.1.0–v1.4.0 notes; Verified Workflow had 11 steps + a Proposed Workflow steps 12-16; Failed Attempts had 18 rows; Results & Parameters covered the canonical mapping, submodule dirs, #1553, #1506, and #1507).
+- **What changed:**
+  - Extended the description with the coupled-count-vs-listing lesson (re-derive EACH coupled claim independently; the audit can mis-frame which of two facts is wrong) and the same-defect-vs-different-defect sibling distinction; added trigger (7).
+  - Added a `v1.5.0 note (UNVERIFIED — plan only; coupled-count-vs-listing case + same-defect siblings)` to the Overview documenting #1449: the COUNT (20) was actually CORRECT and only the LISTING was short by one (`scripts_lib`); the denominator caveat (`ls -d` = 20 vs `find` = 21); `COMPATIBILITY.md:42` as a same-defect sibling fixed in scope while `README.md:113` was already correct (#1188); reuse of the existing `test_readme_subpackage_tree.py` membership guard; and the deliberate decision NOT to guard the prose count string.
+  - Added two "When to Use" triggers (coupled count+listing claim — re-derive each + pin the denominator; same-defect-sibling-in-scope vs different-defect-out-of-scope inventory drift).
+  - Added a new "Proposed Workflow (v1.5.0 — UNVERIFIED, plan only)" section with a warning banner and steps 17-21 (re-derive each coupled claim; pin the denominator; fix same-defect siblings in scope; reuse the nearest existing pytest membership guard; guard membership not the prose count).
+  - Added a coupled-count-vs-listing block to Quick Reference (steps 18-22: live subpackage count via `ls -d` filtered to `__init__.py` dirs vs the over-counting `find`; repo-wide same-defect grep; reuse the existing membership test).
+  - Added five Failed Attempts rows tagged `(v1.5.0, UNVERIFIED)`: parroting "both wrong"; wrong denominator (21 vs 20); treating a same-defect sibling as scope creep; inventing a new test module instead of reusing `test_readme_subpackage_tree.py`; guarding the brittle prose count string.
+  - Added a ProjectHephaestus #1449 block to Results & Parameters (audit framing was inexact; count=20 correct + listing short by `scripts_lib`; denominator caveat; in-scope same-defect siblings `CLAUDE.md`/`ADR-0001:24`/`COMPATIBILITY.md:42` vs already-correct `README.md:113`; membership-only guard reusing `_real_subpackages()`; the same-defect-vs-different-defect distinction from #1553).
+  - Bumped frontmatter version 1.4.0 -> 1.5.0; updated date 2026-06-26 -> 2026-06-30.
+- **Why:**
+  - Planning #1449, the audit coupled two claims about the same inventory ("count 20, listing 19, both wrong"). Live derivation showed the count was actually CORRECT (20) and only the listing was short by one — so the audit mis-framed WHICH of the two coupled facts was wrong. The durable lesson: when an audit couples a count and a listing, re-derive EACH independently against the live tree; don't inherit the "both wrong" framing. A repo-wide grep surfaced `COMPATIBILITY.md:42` as the SAME inventory-count defect (in-scope) while `README.md:113` was already correct (#1188), sharpening the sibling-scope rule into same-defect (fix) vs different-defect (defer). And the guard reuses the existing `test_readme_subpackage_tree.py` membership helper rather than a new module, extending the "mirror the nearest existing guard" rule to a pytest membership test.
+
+---
+
 ## v1.3.0 -> v1.4.0 (2026-06-26)
 
 - **Version:** 1.3.0 -> 1.4.0 (MINOR — adds new findings/failed-attempts for the #1507 follow-on, not a rewrite)
