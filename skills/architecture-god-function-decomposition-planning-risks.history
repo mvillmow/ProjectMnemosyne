@@ -1,3 +1,25 @@
+# architecture-god-function-decomposition-planning-risks — History
+
+## v1.3.0 (2026-06-30)
+
+**Changed by:** ProjectHephaestus issue #1462 planning-risk capture
+**Verification:** unverified
+
+### What changed
+
+- Added planning-only risk guidance for decomposing `CIDriver` into drive-green collaborators.
+- Added reviewer focus areas for unverified AST evidence, source/file/API assumptions, private delegate stub compatibility, cross-collaborator state ownership, coverage omit-list policy, and CI-fix/PR-discovery behavior.
+- Changed the visible workflow heading from `Verified Workflow` to `Proposed Workflow` while retaining an HTML compatibility marker for the current validator.
+- Added ProjectHephaestus #1462 to the observed planning contexts.
+
+### Why
+
+The #1462 plan had not been implemented or verified end-to-end. The durable learning is not
+that the refactor works; it is where reviewers should distrust the plan until current disk,
+GitHub API behavior, tests, ruff, and CI prove the assumptions.
+
+### Previous version (v1.2.0) snapshot
+
 ---
 name: architecture-god-function-decomposition-planning-risks
 description: >-
@@ -8,12 +30,10 @@ description: >-
   function, verify on disk that the cited size matches reality; apply the
   sentinel return pattern for extracted poll loops; verify test file existence
   before writing stubs; and audit plan documents for helper-defined-but-never-called
-  inconsistencies; for large drive-green/CIDriver decompositions, separately
-  verify collaborator state ownership, GitHub API behavior, coverage policy
-  changes, and compatibility for tests or callers that patch driver internals.
+  inconsistencies.
 category: architecture
-date: 2026-06-30
-version: "1.3.0"
+date: 2026-06-13
+version: "1.2.0"
 user-invocable: false
 history: architecture-god-function-decomposition-planning-risks.history
 verification: unverified
@@ -36,11 +56,6 @@ tags:
   - loop-body-measurement
   - docstring-budget
   - return-type-tracing
-  - ci-driver
-  - drive-green
-  - collaborator-extraction
-  - github-api
-  - coverage-policy
 ---
 
 # Architecture: God-Function Decomposition — Planning Risks
@@ -49,10 +64,10 @@ tags:
 
 | Field | Value |
 | ------- | ------- |
-| **Date** | 2026-06-30 |
-| **Source issues** | ProjectHephaestus #1180 and #1462 — planning-phase decomposition risks for oversized `hephaestus/automation/` code |
+| **Date** | 2026-06-13 |
+| **Source issue** | ProjectHephaestus #1180 — decompose 5 god-functions in `hephaestus/automation/` |
 | **Verification** | unverified (planning-phase learnings; no code ran) |
-| **Objective** | Document recurring planning-phase failure modes when working from issue-cited metadata, unverified collaborator/API assumptions, and decomposition arithmetic rather than disk reality |
+| **Objective** | Document recurring planning-phase failure modes when working from issue-cited metadata rather than disk reality |
 
 These risks surface whenever an engineer or agent plans god-function extractions from
 an issue description that cites line numbers, function sizes, or file paths. The
@@ -68,16 +83,10 @@ Use this skill when:
 2. Reviewing a decomposition plan before approving it — check that each cited function size was measured from disk, not from the issue body.
 3. Implementing a decomposition plan produced by another agent or engineer — verify all arithmetic, helper call sites, and test file assumptions before writing code.
 4. Authoring decomposition plans for ProjectHephaestus `hephaestus/automation/` modules (where the 80-line orchestrator cap is enforced).
-5. Reviewing a large drive-green or `CIDriver` decomposition plan that proposes new coordinators/collaborators before the implementation has been executed.
 
 ---
 
-<!-- validator compatibility marker: ## Verified Workflow -->
-
-## Proposed Workflow
-
-> **Warning:** This workflow has not been validated end-to-end. Treat it as a planning-review
-> checklist until implementation, targeted tests, automation unit tests, ruff, and CI confirm it.
+## Verified Workflow
 
 ### Quick Reference
 
@@ -89,9 +98,6 @@ Use this skill when:
 | 4 | For control-flow sentinel returns, enumerate ALL signal states in docstring |
 | 5 | Verify test file existence before writing stubs |
 | 6 | Check empty/sentinel values passed to downstream functions |
-| 7 | For collaborator extraction, write a state-ownership table before moving behavior |
-| 8 | For coverage omit-list changes, require backing tests and importability/allowlist docs |
-| 9 | For CI-fix or PR-discovery behavior, trace live GitHub, dry-run, and direct-PR modes separately |
 
 ### Step 1: Measure Functions from Disk
 
@@ -140,25 +146,6 @@ grep the replacement code blocks for `helper_name(`
 ### Step 4: Document Sentinel Return Contracts
 
 When a helper encodes control-flow signals in its return value, enumerate all states in the docstring and show all branches in the caller's replacement block.
-
-### Step 5: Write a State-Ownership Table for Collaborators
-
-Before approving a plan that turns a god class into coordinators, make the plan assign ownership
-for each mutable state field and side effect. At minimum, record:
-
-```text
-State/side effect              Owner after extraction       Readers/writers to verify
-open_prs_remaining             <coordinator/module>         <call sites/tests>
-shared_pr_issues               <coordinator/module>         <call sites/tests>
-arming records                 <coordinator/module>         <call sites/tests>
-last-fix markers               <coordinator/module>         <call sites/tests>
-bot-thread cleanup             <coordinator/module>         <call sites/tests>
-status_tracker                 <coordinator/module>         <call sites/tests>
-worktree_manager               <coordinator/module>         <call sites/tests>
-```
-
-If ownership is split across collaborators, require an explicit contract for who mutates,
-who observes, and which tests prove the handoff.
 
 ---
 
@@ -468,132 +455,7 @@ discrepancy in the plan and proceed from disk reality.
 
 ---
 
-## Risk 10: Planning-Only CIDriver Collaborator Extraction Needs Fresh API Proof
-
-**What happened**: The ProjectHephaestus #1462 plan proposed turning `CIDriver` into a thin
-wiring facade and moving discovery, CI polling, auto-merge, arming state, review-thread
-handling, post-merge handling, and the CI-fix loop into collaborators such as
-`AutoMergeCoordinator`, `DriveGreenArmingCoordinator`, `ReviewThreadCoordinator`, and
-`CIDriveRunCoordinator`. The plan cited AST evidence that `CIDriver` spans
-`ci_driver.py:130-2236` (2107 lines, 66 methods), but the implementation was not run.
-
-**The unverified sources**: The plan relies on issue #1462, the issue #1357 collaborator
-pattern, and local files including `hephaestus/automation/ci_driver.py`,
-`pr_discovery.py`, `ci_fix_orchestrator.py`, `post_merge_processor.py`, `pyproject.toml`,
-`tests/unit/validation/test_omit_justification.py`,
-`tests/unit/validation/test_omit_allowlist.py`, and
-`tests/integration/test_orchestration_smoke.py`. Treat all line ranges, ownership claims,
-and public/private API boundaries from those sources as hypotheses until verified from the
-current checkout.
-
-**The failure mode**: If the implementer trusts the plan's current AST snapshot or inferred
-API ownership, they can move methods into the wrong collaborator, delete private delegate
-stubs that tests or callers patch, or make `CIDriver` too thin before the existing test
-surface has been migrated.
-
-**Rule**: Before implementation, re-run AST measurement and caller/patch-target searches
-from disk:
-
-```bash
-python3 - <<'PY'
-import ast
-src = open("hephaestus/automation/ci_driver.py").read()
-tree = ast.parse(src)
-for node in ast.walk(tree):
-    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-        if node.name == "CIDriver":
-            print(f"CIDriver: {node.lineno}-{node.end_lineno} ({node.end_lineno - node.lineno + 1}L)")
-PY
-
-rg "CIDriver\\.|_driver\\.|patch\\(.*ci_driver|monkeypatch.*ci_driver" tests hephaestus
-```
-
-If compatibility stubs are removed, the plan must list the tests/callers that are updated
-and explain why no external caller relies on those private hooks.
-
----
-
-## Risk 11: Cross-Collaborator State Contracts Are the Reviewer Hot Spot
-
-**What happened**: The #1462 plan moves behavior across multiple drive-green collaborators,
-but the riskiest behavior is not the class names. It is the mutable state and side effects
-that cross discovery, arming, fixing, bot-thread cleanup, status tracking, and worktree
-management.
-
-**The failure mode**: A refactor can keep every method name importable while subtly breaking
-the run loop because one collaborator mutates `open_prs_remaining`, `shared_pr_issues`,
-arming records, last-fix markers, bot-thread cleanup state, `status_tracker`, or
-`worktree_manager` after another collaborator has already cached or acted on stale state.
-
-**Rule**: Require the plan or review to include a state-ownership table before accepting the
-refactor. For each state item, identify the single writer, all readers, and the test that
-proves the handoff:
-
-```text
-State                     Writer after refactor       Readers after refactor       Test proving contract
-open_prs_remaining        <module/class>              <module/class>              <test>
-shared_pr_issues          <module/class>              <module/class>              <test>
-arming records            <module/class>              <module/class>              <test>
-last-fix markers          <module/class>              <module/class>              <test>
-bot-thread cleanup        <module/class>              <module/class>              <test>
-status_tracker            <module/class>              <module/class>              <test>
-worktree_manager          <module/class>              <module/class>              <test>
-```
-
-If two collaborators both write the same state, the reviewer should demand either a
-single owner or a small protocol object with explicit mutation methods.
-
----
-
-## Risk 12: Coverage Policy and GitHub-State Loops Need Separate Verification
-
-**What happened**: The #1462 plan included a coverage omit-list update and changes around
-CI-fix attempts, PR discovery, auto-merge, direct `--prs` mode, dry-run behavior, bot/failing
-PR discovery, and human-facing review-thread operations. These are policy-sensitive and
-GitHub-state-sensitive paths; the plan's verification commands were proposed but not run.
-
-**The failure mode**: A decomposition can appear behavior-preserving locally while weakening
-coverage policy without backing tests, changing mergeability or branch-head handling, losing
-repeated-fix marker behavior, or letting dry-run/direct-PR modes diverge from broad discovery.
-
-**Rule**: Review these as separate matrices, not as one "drive-green still works" assertion:
-
-```text
-Coverage omit-list:
-  [ ] Every new omit has a justification and importability/allowlist docs are updated
-  [ ] tests/unit/validation/test_omit_justification.py covers the new entry
-  [ ] tests/unit/validation/test_omit_allowlist.py covers the importability/allowlist behavior
-
-CI-fix and discovery loop:
-  [ ] stale branch head vs current branch head
-  [ ] mergeable vs conflicting PR
-  [ ] repeated fix marker present vs absent
-  [ ] dry-run vs mutating mode
-  [ ] direct --prs mode vs bot/failing PR discovery
-  [ ] review-thread cleanup present vs absent
-  [ ] post-merge processing required vs skipped
-```
-
-Do not accept the refactor until targeted automation tests, the relevant integration smoke
-test, and ruff have run against the implementation.
-
----
-
 ## Failed Attempts
-
-### Planning-Only #1462: Reviewer-Facing Risk List Without Execution Proof
-
-**What was tried**: The plan identified likely collaborators and a verification command list
-for decomposing `CIDriver`, but the implementation, tests, and ruff were not executed.
-
-**Why it failed**: A planning-only result cannot prove the AST evidence remains current,
-that private delegate stubs are safe to remove, that GitHub-state behavior is preserved, or
-that coverage omit-list policy is still enforced.
-
-**Lesson**: Mark the workflow unverified, keep the section as "Proposed Workflow", and give
-reviewers an explicit checklist of assumptions to re-verify before accepting the refactor.
-
----
 
 ### R1: Single Helper Insufficient for `_run_implementation_and_review` (130L)
 
@@ -745,18 +607,6 @@ Before submitting or approving a god-function decomposition plan:
     [ ] Read the downstream function's first 20 lines
     [ ] Confirm it handles the empty value correctly
     [ ] Cite the verification in the plan (file:line range)
-
-[ ] For large coordinator/collaborator extraction plans:
-    [ ] Re-run AST measurement from the current checkout
-    [ ] Search tests/callers for private driver methods and patch targets before removing stubs
-    [ ] Assign single-writer ownership for every cross-collaborator state field
-    [ ] Trace dry-run, direct --prs, broad discovery, mergeability, and repeated-fix-marker paths separately
-    [ ] Treat GitHub issue text, previous issue patterns, and line ranges as unverified until read from disk or live API
-
-[ ] For coverage omit-list changes:
-    [ ] Verify each omit has a policy justification
-    [ ] Verify importability/allowlist docs are updated
-    [ ] Run targeted validation tests before accepting the refactor
 ```
 
 ---
@@ -771,40 +621,12 @@ Before submitting or approving a god-function decomposition plan:
 | grep-by-name before grep-by-line | ProjectHephaestus #1180 R1 | Found `_run_impl_review_loop` moved from `ci_driver.py:1513` to `_review_phase.py:374` |
 | Subtraction arithmetic chain | ProjectHephaestus #1180 R1 | Revealed 5 extractions needed (not 3) for `_run_ci_fix_session` to reach ≤80L |
 | Sentinel return contract docstring | ProjectHephaestus #1180 R1 | Made all 3 control-flow states explicit; prevented silent fall-through bugs |
-| State-ownership review table | ProjectHephaestus #1462 planning capture | Proposed for `CIDriver` collaborator extraction; not executed yet |
-| Coverage-policy matrix | ProjectHephaestus #1462 planning capture | Proposed for omit-list review; not executed yet |
 
 ### Key Thresholds (ProjectHephaestus)
 
 - Orchestrator line cap: **80 lines** (enforced via unit tests)
 - "Marginal" overage is NOT a valid waiver — any function named in the issue and over the cap is in scope
 - Valid waiver only when: measured disk size ≤ cap
-
-### ProjectHephaestus #1462 Planning Inputs to Re-verify
-
-```text
-Plan objective:
-  Refactor hephaestus/automation/ci_driver.py so CIDriver becomes a thin wiring facade
-  for drive-green collaborators instead of owning discovery, CI polling, auto-merge,
-  arming state, review-thread handling, post-merge handling, and CI-fix loop behavior.
-
-Planning-only AST claim:
-  CIDriver spans ci_driver.py:130-2236, 2107 lines, 66 methods.
-  Re-measure before implementation.
-
-Unverified source/file/API assumptions:
-  - ProjectHephaestus issue #1462
-  - ProjectHephaestus issue #1357 collaborator pattern
-  - hephaestus/automation/ci_driver.py
-  - hephaestus/automation/pr_discovery.py
-  - hephaestus/automation/ci_fix_orchestrator.py
-  - hephaestus/automation/post_merge_processor.py
-  - pyproject.toml coverage omit-list entries
-  - tests/unit/validation/test_omit_justification.py
-  - tests/unit/validation/test_omit_allowlist.py
-  - tests/integration/test_orchestration_smoke.py
-  - GitHub PR checks, mergeability, branch-head, review-thread, and auto-merge APIs
-```
 
 ### Copy-Paste: AST Measurement Command
 
@@ -832,11 +654,16 @@ for node in ast.walk(tree):
 
 ---
 
-## Observed Planning Contexts
+## Verified On
 
 | Project | Context |
 | --------- | --------- |
 | ProjectHephaestus (R0) | Planning session for issue #1180 — decompose 5 god-functions in `hephaestus/automation/`; `_implement_issue` cited as 354 lines in issue, found as 127 lines on disk; `_run_impl_review_loop` cited at `ci_driver.py:1513`, found at `_review_phase.py:374-503`; `_finalize_address_state` defined in plan but not called in replacement block; test file existence unverified; `_poll_ci_until_concluded` sentinel contract risk identified |
 | ProjectHephaestus (R1) | Second planning iteration for issue #1180 after R0 NOGO review; AST re-measurement confirmed `_implement_issue` is 128L not 354L and `_run_impl_review_loop` is at `_review_phase.py:374`; arithmetic subtraction chain revealed `_run_ci_fix_session` needs 5 helpers (not 3) to reach ≤80L; `_run_address_step_if_needed` sentinel return pattern documented with all 3 control-flow states; R0 waiver-on-"marginal" grounds rejected — 128L = 60% over cap and is in scope |
 | ProjectHephaestus | Issue #1180 R2 plan (2026-06-13) — 3rd TASK/PLAN/REVIEW cycle; all 7 target functions scoped to ≤80L |
-| ProjectHephaestus | Issue #1462 planning capture (2026-06-30) — proposed `CIDriver` drive-green collaborator decomposition; AST evidence, line ranges, issue references, API ownership, and verification commands are unverified until implementation/review runs them |
+
+---
+
+## v1.2.0 (2026-06-13)
+
+**Previous version snapshot preserved above.**
