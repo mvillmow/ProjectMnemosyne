@@ -1,12 +1,13 @@
 ---
 name: pytest-configuration-discovery-and-ci-pitfalls
-description: "Use when: (1) CI Python test job hangs until timeout with no explicit failure — hang signature from asyncio daemon tasks blocking epoll; (2) pytest warns 'ignoring pytest config in pyproject.toml!' or pytest.ini coexists with pyproject.toml causing dual-config conflicts; (3) test collection count is suspiciously low or ImportError on a scripts/ module — conftest.py missing sys.path guard; (4) slim 'pip install pytest' CI jobs silently inherit addopts from pyproject.toml and fail because pytest-cov or other plugins in addopts are not installed; (5) developers run bare pytest and only unit tests are discovered because tests/integration/ is not in testpaths; (6) CI test counts differ from local collection counts — marker-based selection (-m unit, -m integration) inconsistency; (7) a CI matrix has patterns referencing renamed or deleted test files — stale pattern detection; (8) pytest-watch dependency must be replaced with an alternative watcher dependency; (9) test is flaky only in the full suite due to class-level patch.object or hardcoded calendar dates/Unix timestamps; (10) coverage gate fires for a partial test run (e.g. pytest -m integration) but full-suite coverage is fine; (11) a ModuleNotFoundError fires when patching a scripts/ module not on sys.path during single-file pytest runs — add sys.path guard to conftest.py; (12) a test file PASSES when run via explicit path but contributes ZERO coverage in CI because it lives OUTSIDE testpaths and is never collected by the default run — verify COLLECTION with --collect-only, not just that the file passes; (13) deciding whether a sys.path.insert hack in a test is redundant given pythonpath already makes the dir importable as a namespace package; (14) an agent- or developer-authored test hardcodes a machine-specific absolute path (or other host/env-derived value) into an EXPECTED/golden value so it passes on the authoring host but fails on CI — derive the expected value from the same production constant the code interpolates, and run the FULL parametrized test not a subset."
+description: "Use when: (1) CI Python test job hangs until timeout with no explicit failure — hang signature from asyncio daemon tasks blocking epoll; (2) pytest warns 'ignoring pytest config in pyproject.toml!' or pytest.ini coexists with pyproject.toml causing dual-config conflicts; (3) test collection count is suspiciously low or ImportError on a scripts/ module — conftest.py missing sys.path guard; (4) slim 'pip install pytest' CI jobs silently inherit addopts from pyproject.toml and fail because pytest-cov or other plugins in addopts are not installed; (5) developers run bare pytest and only unit tests are discovered because tests/integration/ is not in testpaths; (6) CI test counts differ from local collection counts — marker-based selection (-m unit, -m integration) inconsistency; (7) a CI matrix has patterns referencing renamed or deleted test files — stale pattern detection; (8) pytest-watch dependency must be replaced with an alternative watcher dependency; (9) test is flaky only in the full suite due to class-level patch.object or hardcoded calendar dates/Unix timestamps; (10) coverage gate fires for a partial test run (e.g. pytest -m integration) but full-suite coverage is fine; (11) a ModuleNotFoundError fires when patching a scripts/ module not on sys.path during single-file pytest runs — add sys.path guard to conftest.py; (12) a test file PASSES when run via explicit path but contributes ZERO coverage in CI because it lives OUTSIDE testpaths and is never collected by the default run — verify COLLECTION with --collect-only, not just that the file passes; (13) deciding whether a sys.path.insert hack in a test is redundant given pythonpath already makes the dir importable as a namespace package; (14) an agent- or developer-authored test hardcodes a machine-specific absolute path (or other host/env-derived value) into an EXPECTED/golden value so it passes on the authoring host but fails on CI — derive the expected value from the same production constant the code interpolates, and run the FULL parametrized test not a subset; (15) root-level tests/test_*.py files are outside configured testpaths — add an executable repository guard and wire the pre-commit path filter broadly enough that any tests/ tree change runs it."
 category: testing
-date: 2026-06-26
-version: "1.4.0"
+date: 2026-06-30
+version: "1.5.0"
 user-invocable: false
+verification: verified-ci
 history: pytest-configuration-discovery-and-ci-pitfalls.history
-tags: [pytest, configuration, test-discovery, testpaths, markers, pytest-ini, pyproject-toml, addopts, pythonpath, conftest, sys-path, ci-matrix, stale-patterns, pytest-watcher, coverage, isolation, mock, collect-only, uncollected-tests, namespace-package, machine-path, host-dependent, golden-value, parametrize]
+tags: [pytest, configuration, test-discovery, testpaths, markers, pytest-ini, pyproject-toml, addopts, pythonpath, conftest, sys-path, ci-matrix, stale-patterns, pytest-watcher, coverage, isolation, mock, collect-only, uncollected-tests, namespace-package, machine-path, host-dependent, golden-value, parametrize, root-test-files, validation-guard, pre-commit, check-unit-test-structure, show-prompt]
 ---
 
 # pytest Configuration, Discovery, and CI Pitfalls
@@ -15,10 +16,10 @@ tags: [pytest, configuration, test-discovery, testpaths, markers, pytest-ini, py
 
 | Field | Value |
 |-------|-------|
-| **Date** | 2026-06-26 |
-| **Objective** | Canonical reference for pytest configuration, test-discovery, and CI pitfalls — dual-config conflicts, testpaths/marker discovery gaps, uncollected stray test files outside testpaths, addopts inheritance in slim CI jobs, stale matrix patterns, watcher dependency replacement, sys.path conftest fixes, redundant sys.path.insert under pythonpath namespace packages, and host-dependent EXPECTED/golden values baked from a machine-specific absolute path (green local / red CI) |
+| **Date** | 2026-06-30 |
+| **Objective** | Canonical reference for pytest configuration, test-discovery, and CI pitfalls — dual-config conflicts, testpaths/marker discovery gaps, uncollected stray test files outside testpaths, executable guards against root-level `tests/test_*.py`, addopts inheritance in slim CI jobs, stale matrix patterns, watcher dependency replacement, sys.path conftest fixes, redundant sys.path.insert under pythonpath namespace packages, and host-dependent EXPECTED/golden values baked from a machine-specific absolute path (green local / red CI) |
 | **Outcome** | Synthesised from 6 absorbed skills + uncollected-test-file detection; one general workflow for diagnosing config-shadowing, low collection counts, files silently never collected, partial-run coverage misfires, mock leakage, date bombs, and CI matrix hygiene |
-| **Verification** | verified-ci (multiple projects); Step 11 (uncollected stray file) is **verified-ci** — ProjectHephaestus #1547 PR passed full CI (4532 tests passed) |
+| **Verification** | verified-ci (multiple projects); Step 11 (uncollected stray file / root-level guard) is **verified-ci** — ProjectHephaestus #1547 and #1467 / PR #1723 passed full CI |
 
 ## When to Use
 
@@ -35,6 +36,7 @@ tags: [pytest, configuration, test-discovery, testpaths, markers, pytest-ini, py
 - `ModuleNotFoundError` fires when a `conftest.py` autouse fixture patches a `scripts/` module not on `sys.path` during single-file pytest runs
 - A touched/moved/new test file PASSES via an explicit-path run (`pytest path/to/test_x.py`) but you have NOT confirmed the default CI run actually COLLECTS it — the file may live OUTSIDE `testpaths` and contribute zero coverage. Always verify with `--collect-only`, never trust "the tests pass"
 - An audit flags a cosmetic `sys.path.insert(0, repo_root)` hack in a test, but the REAL latent defect is that the file is uncollected (outside `testpaths`); relocating the file into a configured testpath matters more than deleting the hack
+- A root-level `tests/test_*.py` file appears in a repo whose `testpaths` only include subdirectories such as `tests/unit` and `tests/integration`; add or keep an executable validation guard that rejects this placement
 - Deciding whether a `sys.path.insert` hack is redundant: it IS redundant when (a) the test already imports via the package-prefix form (e.g. `from scripts.show_prompt import ...`) AND (b) `pythonpath` already contains the repo root, since `pythonpath` makes the dir importable as a namespace package with no `__init__.py`
 - An agent- or developer-authored test hardcodes a machine-specific absolute path (or any host/env-derived value) into an EXPECTED / golden value — it PASSES on the authoring host and FAILS on every CI runner with a different `$HOME`. Derive the expected value from the **same** production constant the code interpolates (e.g. `from hephaestus.config.paths import DEFAULT_PROJECTS_DIR`), never a literal path captured from the dev host; and run the FULL parametrized test locally — a narrowed subset can skip the failing parametrization and lie about green
 
@@ -90,6 +92,9 @@ grep -A2 '\[tool.pytest.ini_options\]' pyproject.toml | grep testpaths          
 #   Fix: RELOCATE into a configured testpath, not just delete a cosmetic sys.path hack:
 git mv tests/test_show_prompt.py tests/unit/scripts/test_show_prompt.py
 pixi run pytest --collect-only -q 2>/dev/null | grep -c "test_show_prompt.py::"   # now 43
+#   Guard the repo so this cannot regress:
+pixi run hephaestus-check-test-structure
+pixi run pre-commit run check-unit-test-structure --all-files
 
 # 11 — Is a sys.path.insert hack redundant? (pythonpath namespace-package check)
 grep -n "sys.path.insert" tests/<file>.py            # the hack
@@ -364,7 +369,8 @@ def test_parses_date():
 > **Verification:** This step is **verified-ci**. The `--collect-only` count (0) and the
 > explicit-path run (43 passed) were both observed in ProjectHephaestus issue #1547; the
 > relocation fix (`git mv tests/test_show_prompt.py tests/unit/scripts/test_show_prompt.py`)
-> passed full CI with 4532 tests passing.
+> passed full CI with 4532 tests passing. ProjectHephaestus issue #1467 / PR #1723 then
+> added the executable root-level-test guard and was driven to green CI.
 
 **Root cause**: `pyproject.toml` sets `testpaths = ["tests/unit", "tests/integration"]`. A
 test file that sits at the top-level `tests/` dir (e.g. `tests/test_show_prompt.py`, 43
@@ -397,6 +403,34 @@ git mv tests/test_show_prompt.py tests/unit/scripts/test_show_prompt.py   # into
 # Edit any in-file import that referenced the old location, in the SAME change.
 pixi run pytest --collect-only -q 2>/dev/null | grep -c "test_show_prompt.py::"   # now 43 — collected
 ```
+
+**Guard the repository, not just the one file.** If the repo's `testpaths` intentionally
+exclude the root `tests/` directory, add or keep a validation predicate that rejects
+root-level `tests/test_*.py` files. The ProjectHephaestus #1467 / PR #1723 shape was:
+
+- `check_no_uncollected_root_test_files(tests_root: Path)` in the existing test-structure
+  validation framework.
+- A stderr reporter that names the offending root-level test file and explains that
+  `pyproject.toml testpaths` only collect `tests/unit` and `tests/integration`.
+- Wire the predicate into `check_test_structure()` so it rides the existing
+  `hephaestus-check-test-structure` executable and existing CI/pre-commit gate.
+- Add regression coverage in `tests/unit/validation/test_test_structure.py`.
+- Broaden the `.pre-commit-config.yaml` `check-unit-test-structure` file filter from
+  `^(hephaestus|tests/unit)/` to `^(hephaestus|tests)/` so changes anywhere under
+  `tests/` run the guard.
+
+```bash
+pixi run pytest tests/unit/scripts/test_show_prompt.py
+pixi run pytest tests/unit/validation/test_test_structure.py -k "root_test or test_structure"
+pixi run hephaestus-check-test-structure
+pixi run pre-commit run check-unit-test-structure --all-files
+```
+
+**Do not remove runtime bootstrap code because an issue mentions a test-side hack.** In the
+show-prompt case, `tests/unit/scripts/test_show_prompt.py` was the correct in-collection
+home for the test. The old test-side `sys.path.insert(...)` hack was fragile, but
+`scripts/show_prompt.py` runtime bootstrap behavior was separate production behavior and
+should not be deleted as part of the collection fix.
 
 **Risks (verify before relocating)**:
 
@@ -499,6 +533,9 @@ pixi run pytest tests/unit/automation/test_automation_parsers.py::test_parser_ac
 | Trusted explicit-path run | Ran `pytest tests/test_show_prompt.py` → 43 passed → assumed the file was covered in CI | The file lived OUTSIDE `testpaths`, so the default run collected 0; an explicit CLI path overrides `testpaths` and masks the gap | Verify COLLECTION with `--collect-only` (compare EXPECTED vs ACTUAL count), never trust "the tests pass" |
 | Deleted only the cosmetic `sys.path.insert` the audit flagged | Removed the hack the audit pointed at and called it done | The real latent defect was that the file was uncollected (outside testpaths); removing the hack left 43 tests still contributing zero coverage | RELOCATE the file into a configured testpath (`git mv`); the cosmetic hack is the symptom, not the defect |
 | Added a new `__init__.py`-bearing dir and moved the file without checking import refs | `git mv` only, no in-file import edit / no old-path grep | An import referencing the old path (or a name collision in the destination) breaks history/imports | `git mv` + the in-file import edit must BOTH land; `grep` for old-path references first |
+| Fixed one misplaced test file but left no repository guard | Moved `tests/test_show_prompt.py` into `tests/unit/scripts/` and stopped there | A future root-level `tests/test_*.py` could again pass explicit-path checks but remain outside `testpaths` | Add an executable guard in the existing validation framework and run it from CI/pre-commit |
+| Kept the pre-commit hook filter scoped to `tests/unit` only | Added the guard, but the hook only triggered on `^(hephaestus|tests/unit)/` | A change under root `tests/` could bypass the local guard before commit | Broaden the hook filter to `^(hephaestus|tests)/` so any tests tree change runs `check-unit-test-structure` |
+| Deleted `scripts/show_prompt.py` runtime bootstrap while chasing `sys.path.insert` | Treated all path bootstrapping as the same smell | The runtime bootstrap belongs to production script execution; the excluded test-file hack was separate | Remove or avoid only the fragile test-side hack; preserve runtime behavior unless independently proven dead |
 | Baked the authoring host's absolute path into `EXPECTED_SPECS` | Copied the resolved `--projects-dir` help text (`/mnt/weka/home/.../Projects`) literally into the golden | The help string interpolates a per-host constant (`DEFAULT_PROJECTS_DIR`); the literal matched only the authoring machine — green local, red on every CI runner | Derive the expected value from the SAME production constant the code uses (`f"``{DEFAULT_PROJECTS_DIR}``"`); never hardcode a host-captured absolute path |
 | Ran a narrowed test subset locally, saw green, pushed | Assumed a subset run validated the parser test | The machine-path parametrization wasn't in the subset; CI ran the full matrix and failed | Run the FULL parametrized test locally before trusting green; subset runs can mask host-dependent parametrizations |
 
@@ -558,6 +595,23 @@ pixi run pytest --collect-only -q 2>/dev/null | grep -c "<testfile>.py::"   # no
 | `pytest --collect-only -q \| grep -c "test_show_prompt.py::"` (file outside testpaths) | `0` | NOT collected by default CI run |
 | `pytest tests/test_show_prompt.py` (explicit path) | `43 passed` | Explicit path overrides testpaths — masks the gap |
 | `pytest --collect-only -q \| grep -c "test_show_prompt.py::"` (after `git mv` into `tests/unit/scripts/`) | `43` | Now collected by the default run |
+
+### Root-Level `tests/test_*.py` Guard
+
+```bash
+# Fail if any root-level test files sit outside configured testpaths.
+pixi run hephaestus-check-test-structure
+pixi run pre-commit run check-unit-test-structure --all-files
+```
+
+| Guard element | ProjectHephaestus #1467 / PR #1723 implementation |
+|---------------|----------------------------------------------------|
+| Predicate | `check_no_uncollected_root_test_files(tests_root: Path)` |
+| Orchestrator | wired into `check_test_structure()` |
+| Diagnostic | stderr explains root `tests/test_*.py` files are outside `pyproject.toml testpaths = ["tests/unit", "tests/integration"]` |
+| Regression tests | `tests/unit/validation/test_test_structure.py` |
+| Pre-commit trigger | `check-unit-test-structure` broadened to `^(hephaestus|tests)/` |
+| Correct show-prompt location | `tests/unit/scripts/test_show_prompt.py` |
 
 ### Redundant `sys.path.insert` Under `pythonpath` (namespace package)
 
@@ -623,4 +677,5 @@ Formula: `timeout_seconds = max(180, ceil(actual_duration * 3 / 60) * 60)`
 | ProjectHermes | PR #475 — `fail_under = 80` in pyproject.toml | integration-only CI job failed at 78.52%; gate moved to full-suite step |
 | ProjectOdyssey | Issue #3357, PR #4001 — stale CI pattern detection/removal | `check_stale_patterns()` added (13 tests pass); dangling matrix tokens removed |
 | ProjectHephaestus | Issue #1547 — `tests/test_show_prompt.py` outside testpaths | **verified-ci**: `--collect-only` count `0`; explicit-path run `43 passed`; fix = `git mv` into `tests/unit/scripts/`; redundant `sys.path.insert` removed (import was package-prefix + `pythonpath=["."]`); PR passed full CI with 4532 tests |
+| ProjectHephaestus | Issue #1467, PR #1723 — root-level `tests/test_*.py` guard for uncollected tests | **verified-ci**: `tests/unit/scripts/test_show_prompt.py` is the correct in-collection home; `check_no_uncollected_root_test_files(tests_root: Path)` rejects root-level `tests/test_*.py`; `check_test_structure()` reports that configured `testpaths` only collect `tests/unit` and `tests/integration`; `check-unit-test-structure` pre-commit trigger broadened to all `tests/`; PR was driven green/merged per session context |
 | ProjectHephaestus | Issue #1392, PR #1621 — `test_automation_parsers.py::test_parser_action_specs_are_preserved[loop_runner-_build_parser]` host-dependent EXPECTED value | **verified-ci**: agent baked its own absolute path (`/mnt/weka/home/micah.villmow/Projects`) into `EXPECTED_SPECS` for `--projects-dir`; green on authoring host, red on every CI runner; fix = derive expected from `DEFAULT_PROJECTS_DIR` via `f"``{DEFAULT_PROJECTS_DIR}``"` (same constant the parser interpolates) + run the FULL parametrized test, not a subset |
