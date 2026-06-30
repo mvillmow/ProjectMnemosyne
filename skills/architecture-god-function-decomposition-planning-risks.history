@@ -1,0 +1,45 @@
+<!-- markdownlint-disable MD024 -->
+# architecture-god-function-decomposition-planning-risks — History
+
+## v1.3.0 (2026-06-29)
+
+**Changed by:** ProjectHephaestus issue #1404 planning — /learn
+**Verification:** unverified (planning-only; the new Risk 10 ran no code change and produced no PR with a diff)
+
+### What changed
+
+- Added **Risk 10: The Entire Refactor May Already Be Done — Plan a No-Op
+  Verification, Not a Re-Implementation (#1404)**. The terminal case of the
+  Risk 1 / Risk 9 stale-issue-body drift: not "the cited numbers shifted" but
+  "the deliverable is already gone." Captured from planning issue #1404, which
+  asked to decompose `tidy.py:main()` + `pr_merge.py:main()` (both allegedly
+  `noqa: C901`) — but disk probes showed the suppressions were gone, both
+  `main()` were already 24L thin orchestrators, `ruff --select C901` passed, and
+  `git log` revealed PRs #1632 + #1633 had already shipped the exact extraction.
+  - **Rule**: run the issue's own success criteria (grep for the `noqa` it
+    removes; AST-measure the cited god-function; run the linter it cites; then
+    `git log` the files) as probes against disk BEFORE planning. If they already
+    pass, write `Files to Create/Modify: _None._`, attribute the work to the
+    landing PR(s), and make Verification re-run the probes as proof — never open
+    a PR that re-edits already-correct source.
+  - **Corollary**: the issue's proposed *mechanism* may also be wrong and that's
+    fine — #1404's `COMMANDS = {command: handler}` dict dispatch can't apply to a
+    flag-driven single-command CLI (zero `add_subparsers`/`args.command` hits).
+    Satisfy the issue's intent (lower complexity, testable handlers), not its
+    literal pseudocode.
+- Updated frontmatter: `version` 1.2.0 → 1.3.0, `date` 2026-06-13 → 2026-06-29,
+  expanded `description` to cover the already-resolved-issue probe-first workflow,
+  added tags `already-resolved-issue`, `no-op-verification-plan`,
+  `prior-pr-attribution`, `issue-intent-vs-mechanism`.
+- Added a "Verified On" row for #1404 (planning-only, unverified).
+
+## v1.2.0 (2026-06-13)
+
+**Source issue:** ProjectHephaestus #1180 — decompose 5 god-functions in `hephaestus/automation/`
+**Verification:** unverified (planning-phase learnings; no code ran)
+
+### What changed
+
+- Initial captured risks (Risk 1–9), Failed Attempts, Planning Checklist, and
+  the AST-measurement / subtraction-chain copy-paste templates from the #1180
+  R0/R1/R2 TASK/PLAN/REVIEW cycles.

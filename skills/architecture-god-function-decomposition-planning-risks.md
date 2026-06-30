@@ -8,10 +8,17 @@ description: >-
   function, verify on disk that the cited size matches reality; apply the
   sentinel return pattern for extracted poll loops; verify test file existence
   before writing stubs; and audit plan documents for helper-defined-but-never-called
-  inconsistencies.
+  inconsistencies. ALSO use when the issue's central deliverable may already be
+  done by a prior PR — run the issue's own success criteria (grep for the
+  noqa it removes, AST-measure the cited god-function, run the linter it cites)
+  as probes against disk BEFORE planning; if they already pass, write a no-op
+  verification plan (Files to Create/Modify: None) that attributes the work to
+  the PR that landed it via `git log`, instead of re-churning already-merged
+  source — and satisfy the issue's INTENT, not its literal pseudocode mechanism
+  (a proposed COMMANDS-dict dispatch does not apply to a flag-driven single-command CLI).
 category: architecture
-date: 2026-06-13
-version: "1.2.0"
+date: 2026-06-29
+version: "1.3.0"
 user-invocable: false
 history: architecture-god-function-decomposition-planning-risks.history
 verification: unverified
@@ -34,6 +41,10 @@ tags:
   - loop-body-measurement
   - docstring-budget
   - return-type-tracing
+  - already-resolved-issue
+  - no-op-verification-plan
+  - prior-pr-attribution
+  - issue-intent-vs-mechanism
 ---
 
 # Architecture: God-Function Decomposition — Planning Risks
@@ -433,6 +444,66 @@ discrepancy in the plan and proceed from disk reality.
 
 ---
 
+## Risk 10: The Entire Refactor May Already Be Done — Plan a No-Op Verification, Not a Re-Implementation (#1404)
+
+**What happened**: Issue #1404 asked to decompose `tidy.py:main()` and `pr_merge.py:main()`,
+both "marked `noqa: C901`", into per-subcommand handlers dispatched via a `COMMANDS = {...}`
+dict. Disk reality (ProjectHephaestus, 2026-06-29):
+
+- `grep -rn "noqa.*C901" hephaestus/github/tidy.py hephaestus/github/pr_merge.py` → **zero hits**.
+  The suppressions the issue's central deliverable removes do not exist.
+- AST measurement: `tidy.py:main()` is 24L (`617-640`); `pr_merge.py:main()` is 24L (`457-484`).
+  Both already thin orchestrators dispatching to 9+ extracted module-level handlers.
+- `pixi run ruff check --select C901 …` → `All checks passed!` (`max-complexity = 12`).
+- `git log -- <files>` showed `b6b7a3ba (#1632)` and `16cdd699 (#1633)` had **already** shipped
+  the exact extraction, both landing *after* the issue was filed.
+
+The whole task was complete before planning began. The correct plan was a **verification /
+already-resolved disposition**: `Files to Create: None`, `Files to Modify: None`, a verification
+block that *proves* the resolved state (the same greps/AST/lint/test commands), and attribution
+to the PRs that did the work — explicitly invoking the skill's own waiver rule ("valid waiver
+only when measured disk size ≤ cap").
+
+**The failure mode**: An agent that trusts the issue body re-implements an already-merged
+refactor — re-churning tested code, risking regressions, wasting a full PR cycle, and producing
+a diff a reviewer must reconcile against work that already exists. This is the terminal case of
+Risk 1/Risk 9 stale-issue drift: not "the numbers shifted" but "the deliverable is already gone."
+
+**Rule**: Before planning ANY decomposition, run the issue's *own success criteria* as probes
+against disk — if they already pass, the plan is a verification, not an implementation:
+
+```bash
+# 1. The suppressions the issue removes — do they still exist?
+grep -rn "noqa.*C901" <each cited file>          # zero hits ⇒ already removed
+
+# 2. Are the cited god-functions already under the cap?
+python3 -c "import ast; [print(f'{n.name}: {n.end_lineno-n.lineno+1}L') \
+  for n in ast.walk(ast.parse(open('FILE').read())) \
+  if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name=='main']"
+
+# 3. Does the linter the issue cites already pass?
+<runner> ruff check --select C901 <each cited file>   # 'All checks passed!' ⇒ done
+
+# 4. WHO did it? — attribute, don't re-do.
+git log --oneline -- <each cited file>           # find the PR(s) that landed the work
+```
+
+If steps 1–3 already pass, write `Files to Create: _None._`, `Files to Modify: _None._`, cite
+the PRs from step 4, and make the Verification section re-run 1–3 as the proof. **Do not open a
+PR that re-edits already-correct source.** If repo policy requires a `Closes #N` PR to close the
+issue, the plan should say so explicitly and propose a docs-only closure path — never a re-churn
+of the source.
+
+**Corollary — the issue's proposed mechanism may also be wrong, and that's fine.** #1404 proposed
+a `COMMANDS = {command: handler}` dict dispatch, but `grep "add_subparsers\|args.command"` → zero
+hits in both files: these are flag-driven single-command CLIs with no `command` attribute, so a
+command-keyed dict could never apply. The shipped fix (extract sequential-phase helpers) was the
+correct pattern and met every stated *impact* goal. When the issue's mechanism doesn't match the
+code's shape, satisfy the issue's **intent** (lower complexity, independently-testable handlers),
+not its literal pseudocode.
+
+---
+
 ## Failed Attempts
 
 ### R1: Single Helper Insufficient for `_run_implementation_and_review` (130L)
@@ -639,3 +710,4 @@ for node in ast.walk(tree):
 | ProjectHephaestus (R0) | Planning session for issue #1180 — decompose 5 god-functions in `hephaestus/automation/`; `_implement_issue` cited as 354 lines in issue, found as 127 lines on disk; `_run_impl_review_loop` cited at `ci_driver.py:1513`, found at `_review_phase.py:374-503`; `_finalize_address_state` defined in plan but not called in replacement block; test file existence unverified; `_poll_ci_until_concluded` sentinel contract risk identified |
 | ProjectHephaestus (R1) | Second planning iteration for issue #1180 after R0 NOGO review; AST re-measurement confirmed `_implement_issue` is 128L not 354L and `_run_impl_review_loop` is at `_review_phase.py:374`; arithmetic subtraction chain revealed `_run_ci_fix_session` needs 5 helpers (not 3) to reach ≤80L; `_run_address_step_if_needed` sentinel return pattern documented with all 3 control-flow states; R0 waiver-on-"marginal" grounds rejected — 128L = 60% over cap and is in scope |
 | ProjectHephaestus | Issue #1180 R2 plan (2026-06-13) — 3rd TASK/PLAN/REVIEW cycle; all 7 target functions scoped to ≤80L |
+| ProjectHephaestus (planning-only, unverified) | Issue #1404 plan (2026-06-29) — Risk 10. Issue asked to decompose `tidy.py:main()` + `pr_merge.py:main()` (both "marked `noqa: C901`") via a `COMMANDS`-dict dispatch. Disk probes: `grep noqa.*C901` → 0 hits; AST → both `main()` are 24L thin orchestrators (`tidy.py:617-640`, `pr_merge.py:457-484`); `ruff --select C901` → all pass; `git log` → already shipped by `#1632` + `#1633`. Proposed `COMMANDS` dict inapplicable (no `add_subparsers`/`args.command` — flag-driven single-command CLIs). Correct disposition: no-op verification plan (Files to Create/Modify: None) attributing the work to the prior PRs. NOT executed end-to-end (no code change, no PR with a diff) |
