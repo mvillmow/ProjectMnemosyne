@@ -2,6 +2,37 @@
 
 # History: github-auto-merge-ci-gating-merge-method
 
+## v1.6.0 (2026-06-30)
+
+Added ProjectHephaestus PR #1719 / issue #1465 drive-green evidence for the
+`state:implementation-go` present but auto-merge not yet armed case.
+
+- **What changed:**
+  - Bumped `version` 1.5.0 -> 1.6.0 and `date` 2026-06-26 -> 2026-06-30.
+  - Added `verification: verified-ci` frontmatter to match the skill's stated validation level.
+  - Extended the description, tags, Overview, When-to-Use, Quick Reference, detailed workflow,
+    Failed Attempts, Results & Parameters, and Verified On sections for advisory
+    `auto-merge-policy` red after implementation-review GO.
+  - Captured the PR #1719 evidence: branch `1465-auto-impl`, head
+    `3c0ef9f3e0d6e4367354e89c139e73ac1e6de365`, arming record
+    `build/.issue_implementer/drive-green-armed-1465.json`, and arming timestamp
+    `2026-06-30T20:26:10Z`.
+- **Why:** The visible red CI signal on PR #1719 was not a source-code failure. The
+  advisory `auto-merge-policy` job correctly reported that implementation GO was present but
+  auto-merge had not been armed yet. The fix was to let scoped drive-green arm auto-merge and
+  then verify current-head checks, while keeping the source fix scoped to the live
+  `loop_runner.py` deferred `tempfile` import.
+- **Verification:** verified-ci — ProjectHephaestus PR #1719 for issue #1465 reached green CI
+  after drive-green armed auto-merge for head
+  `3c0ef9f3e0d6e4367354e89c139e73ac1e6de365`.
+- Bump version 1.5.0 -> 1.6.0.
+
+### Snapshot of v1.5.0 (archived before the v1.6.0 edit)
+
+The full v1.5.0 snapshot is preserved in git as the parent version of this history entry.
+
+---
+
 ## v1.5.0 (2026-06-26)
 
 Added the ProjectHephaestus PR-completion/current-head check workflow from PR #1646.

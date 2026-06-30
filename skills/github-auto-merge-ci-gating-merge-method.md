@@ -1,10 +1,11 @@
 ---
 name: github-auto-merge-ci-gating-merge-method
-description: "Use when: (1) a PR has mergeStateStatus CLEAN or MERGEABLE but auto-merge never fires despite all checks passing, (2) gh pr merge --auto --rebase or --squash returns an error or silently fails on a squash-only repo, (3) a PR is BLOCKED because required CI status contexts never post (workflow never triggered, paths filter excluded PR, required check name mismatch), (4) GPG-signing failures or mismatched committer emails cause commits to be unsigned and block the pr-policy gate, (5) branch protection rulesets and classic branch protection disagree and their union blocks merge, (6) a CI ruleset chicken-and-egg deadlock blocks a PR that introduces a new workflow, (7) an advisory check should not block merge but currently does because it lives in the required gate, (8) deciding which merge method a repo supports before arming auto-merge, (9) auditing required-check names after adding or removing CI jobs, (10) state:implementation-go label or pr-policy gates auto-merge arming, (11) per-issue arming-state machine is triggered on the wrong event (optimistic point vs detected merge), (12) mergeStateStatus=BLOCKED with all CI green and auto-merge armed - unresolved review threads are the PRIMARY blocker to check FIRST before assuming CI failure, (13) stale failed status-rollup entries must be distinguished from current-head required checks before deciding a PR is blocked or complete"
+description: "Use when: (1) a PR has mergeStateStatus CLEAN or MERGEABLE but auto-merge never fires despite all checks passing, (2) gh pr merge --auto --rebase or --squash returns an error or silently fails on a squash-only repo, (3) a PR is BLOCKED because required CI status contexts never post (workflow never triggered, paths filter excluded PR, required check name mismatch), (4) GPG-signing failures or mismatched committer emails cause commits to be unsigned and block the pr-policy gate, (5) branch protection rulesets and classic branch protection disagree and their union blocks merge, (6) a CI ruleset chicken-and-egg deadlock blocks a PR that introduces a new workflow, (7) an advisory check should not block merge but currently does because it lives in the required gate, (8) deciding which merge method a repo supports before arming auto-merge, (9) auditing required-check names after adding or removing CI jobs, (10) state:implementation-go label or pr-policy gates auto-merge arming, (11) per-issue arming-state machine is triggered on the wrong event (optimistic point vs detected merge), (12) mergeStateStatus=BLOCKED with all CI green and auto-merge armed - unresolved review threads are the PRIMARY blocker to check FIRST before assuming CI failure, (13) stale failed status-rollup entries must be distinguished from current-head required checks before deciding a PR is blocked or complete, (14) auto-merge-policy is red after implementation-review GO because auto-merge was not armed yet and drive-green must arm it."
 category: ci-cd
-date: 2026-06-26
-version: "1.5.0"
+date: 2026-06-30
+version: "1.6.0"
 user-invocable: false
+verification: verified-ci
 history: github-auto-merge-ci-gating-merge-method.history
 tags:
   - auto-merge
@@ -24,6 +25,8 @@ tags:
   - current-head-checks
   - status-rollup
   - dco-signoff
+  - advisory-auto-merge-policy
+  - drive-green
 ---
 
 # GitHub Auto-Merge: CI Gating, Branch Protection, and Merge Method
@@ -37,6 +40,7 @@ tags:
 | 2026-06-14 | Expanded unresolved review thread diagnostic to verified-ci status: PR #1282 was BLOCKED despite all CI green and auto-merge armed; the stated "lint failure" was stale; the real blockers were 2 unresolved review threads. Resolving via `resolveReviewThread` GraphQL mutation immediately triggered auto-merge (merged 2026-06-15T03:05:38Z by app/github-actions). Added full GraphQL copy-paste workflow for thread query + reply + resolve. | verified-ci — PR #1282 ProjectHephaestus merged within seconds of thread resolution |
 | 2026-06-15 | Folded v1.3.0 improvements from the briefly-reintroduced `squash-only-repo-merge-method-docs` standalone (PR #2546) back into this consolidated skill, then re-removed the standalone duplicate (restoring the #2200 consolidation): the f-string regression-test pattern (`inspect.getsource(_make_agent_prompt)`, not a `_AGENT_PROMPT_TEMPLATE` constant), the explicit per-block `<!-- merge-method-allowed: example -->` lint-exemption marker replacing a brittle 10-line look-back heuristic, the plain-`jq -r` form (not `gh api --jq -` over stdin), and tiered helper sourcing for cross-repo callers | verified-ci (shipped in ProjectHephaestus PR #1069); standalone duplicate re-removed |
 | 2026-06-26 | Added a ProjectHephaestus PR-completion checklist for label-gated auto-merge: create a PR with literal `Closes #N`, verify signed/DCO commits, apply `state:implementation-go` before relying on auto-merge policy, arm `gh pr merge --auto --squash`, watch the current-head Test matrix, and distinguish stale failed rollup entries from later successful current runs before declaring completion. | verified-ci — ProjectHephaestus PR #1646 closed issue #1645 and merged after Test workflow run 28256151963 and Required Checks run 28256238895 succeeded |
+| 2026-06-30 | Clarified the ProjectHephaestus drive-green interpretation when implementation review already yielded GO but auto-merge is not armed yet: `auto-merge-policy` can show red with `PR has state:implementation-go but auto-merge is not enabled` as an advisory signal, while the required path is to let drive-green arm auto-merge and then verify current-head checks. | verified-ci — PR #1719 for issue #1465 reached green after drive-green armed auto-merge for head `3c0ef9f3e0d6e4367354e89c139e73ac1e6de365` |
 
 GitHub auto-merge is **stricter than branch protection** and fires only when EVERY check (required and non-required) reaches a clean terminal state, the chosen merge method is allowed, every required status context has actually posted, all commits are verified-signed, and BOTH protection layers (ruleset + classic) are satisfied. A PR that looks ready (`mergeStateStatus: CLEAN`/`MERGEABLE`) can sit forever when any one of those is silently unmet. This skill covers the merge-blocking mechanics; it does NOT cover general CI failure diagnosis, rebase-conflict resolution, review-loop orchestration, or PR enumeration.
 
@@ -56,6 +60,7 @@ GitHub auto-merge is **stricter than branch protection** and fires only when EVE
 - A post-CI `/learn` (or any capture step) fires on the optimistic point (auto-merge armed) instead of the truth (detected merge), polluting downstream state.
 - **A PR is `BLOCKED` with all CI checks green and auto-merge already armed** — unresolved review threads are the PRIMARY blocker to check FIRST (verified-ci: PR #1282 merged immediately after thread resolution).
 - Completing a ProjectHephaestus PR where `pr-policy` / auto-merge policy depends on a literal issue-closing line, signed DCO commits, the `state:implementation-go` label, and current-head required checks rather than stale failed status-rollup entries.
+- A ProjectHephaestus PR already has implementation-review GO, but `auto-merge-policy` is red because auto-merge has not been enabled yet; treat that as a drive-green arming task, not as a source-code failure.
 
 ## Verified Workflow
 
@@ -100,6 +105,12 @@ gh pr merge <PR> --repo HomericIntelligence/ProjectHephaestus --auto --squash
 gh pr checks <PR> --repo HomericIntelligence/ProjectHephaestus --watch --interval 30
 gh pr view <PR> --repo HomericIntelligence/ProjectHephaestus \
   --json state,mergedAt,mergeCommit,mergeStateStatus,statusCheckRollup
+
+# 10. ProjectHephaestus: implementation GO but auto-merge not armed yet
+gh pr view <PR> --repo HomericIntelligence/ProjectHephaestus \
+  --json autoMergeRequest,headRefName,headRefOid,labels,statusCheckRollup
+hephaestus-merge-prs --issues <ISSUE> --agent <agent>
+test -f build/.issue_implementer/drive-green-armed-<ISSUE>.json
 ```
 
 ### Detailed Steps
@@ -413,6 +424,27 @@ Public evidence: ProjectHephaestus PR #1646 was created for issue #1645 with lit
 run 28256151963 and Required Checks run 28256238895 succeeded; an earlier Required Checks run with
 failed auto-merge-policy did not block the later merge.
 
+#### ProjectHephaestus drive-green: GO label present, auto-merge not armed yet
+
+When implementation review has already yielded GO, a red advisory `auto-merge-policy` job with:
+
+```text
+PR has state:implementation-go but auto-merge is not enabled.
+Run: gh pr merge $PR_NUMBER --auto --squash
+```
+
+does not mean the implementation diff is broken. It means the PR is between review approval and the
+drive-green arming step. The correct next step is to run the scoped drive-green path for the owning
+issue/PR, then verify that an arming record exists and the current head is the one that was armed.
+
+ProjectHephaestus issue #1465 / PR #1719 showed this exact shape. The issue body had stale evidence
+for a local `ci_driver.py` `re` import; the only live source fix was hoisting `tempfile` from
+`loop_runner.py::_make_work_report_path` to module scope. The implementation commit was
+`3c0ef9f3e0d6e4367354e89c139e73ac1e6de365`. After implementation-review GO, the run log showed
+the issue already had PR #1719 and skipped re-review; drive-green then armed auto-merge and wrote
+`build/.issue_implementer/drive-green-armed-1465.json` for branch `1465-auto-impl` at
+`2026-06-30T20:26:10Z`.
+
 ## Failed Attempts
 
 | Attempt | What Was Tried | Why It Failed | Lesson Learned |
@@ -427,6 +459,7 @@ failed auto-merge-policy did not block the later merge.
 | Treated `cancelled` sibling jobs as real failures | Counted every non-success rollup entry | One `pr-policy` race failure tore down the run via the `concurrency` group, cancelling all siblings; a green re-run superseded them | Filter by `conclusion=="FAILURE"` AND `startedAt` later than open+60s; cross-check `state` (may be MERGED); never force-merge to escape |
 | Ran `--auto --squash` right after create on a #899 repo | Old habit | `pr-policy` Check 2 fails `Auto-merge is enabled before implementation review GO` | Match the label to the auto-merge state; add `state:implementation-go` OR `--disable-auto` |
 | Enabled auto-merge before the implementation GO label | `gh pr merge --auto --squash` before `state:implementation-go` existed on the PR | The auto-merge-policy/pr-policy gate saw auto-merge armed before review approval state and failed the earlier Required Checks run | Apply `state:implementation-go` first, then rely on auto-merge policy; if a stale pre-label failure remains in the rollup, verify the later current run |
+| Treated advisory `auto-merge-policy` red after GO as a source-code CI failure | Investigated the implementation diff instead of checking whether auto-merge was armed | The message explicitly said the PR had `state:implementation-go` but auto-merge was not enabled; the source change was already review-GO | Let scoped drive-green arm auto-merge, then verify the arming record and current-head checks |
 | Treated stale failed Required Checks rollup entries as current blockers | Read a failed Required Checks entry from before the GO label as if it described the current HEAD | A later Required Checks run passed after the label and did not block the merge | Check current-head `gh pr checks --watch` and the later Required Checks run before deciding the PR is blocked |
 | Claimed completion before the Test matrix reached a terminal state | Saw auto-merge armed and policy prerequisites in place, then stopped watching | Auto-merge only merges after the active required checks finish; queued or in-progress matrix jobs can still fail | Keep `gh pr checks --watch --interval 30` running until the current-head Test matrix is terminal, then confirm `state=MERGED` / `mergedAt` |
 | Added `{"type":"required_conversation_resolution"}` to a ruleset | PUT it into `rules[]` | `HTTP 422: data matches no possible input` — it is classic-only | Keep convo-resolution in classic; `required_linear_history`/`non_fast_forward` ARE valid ruleset types |
@@ -567,6 +600,7 @@ call-site bug. Asserting on `_AGENT_PROMPT_TEMPLATE` (assuming a module constant
 | Required-check context format | bare job `name:` (e.g. `lint`), NOT `"Required Checks / lint"` |
 | GO label set | `state:plan-go`, `state:plan-no-go`, `state:needs-plan`, `state:implementation-go`, `state:implementation-no-go` |
 | Arming record path | `state_dir/drive-green-armed-<issue>.json` |
+| ProjectHephaestus issue #1465 arming evidence | `build/.issue_implementer/drive-green-armed-1465.json`, PR #1719, branch `1465-auto-impl`, head `3c0ef9f3e0d6e4367354e89c139e73ac1e6de365`, armed `2026-06-30T20:26:10Z` |
 | `gh pr list` default limit | 30 — use `--limit 200` for backlogs |
 
 ### Label-gated auto-merge workflow constraints
@@ -625,3 +659,4 @@ later successful required run plus `state=MERGED`, `mergedAt`, and `mergeCommit`
 | ProjectHephaestus | 2026-06-14: drove 13 open PRs toward mergeable during a `/myrmidon-swarm` run — hit the classic-vs-ruleset review-count UNION hard gate (`viewerCanEnableAutoMerge=false`), a `required-checks-gate` keystone PR (`_required.yml` `if: always()` aggregator) blocking the whole queue, and duplicate check-runs after a re-run | verified-local: the union gate was confirmed by API inspection (classic count=1 UNION ruleset count=0); keystone-first + re-rebase identified as the queue unblock; PRs had not yet merged at capture |
 | ProjectHephaestus | 2026-06-14: PR #1282 (`1315-harden-ci-required-gate`) BLOCKED with all CI green and auto-merge armed; stated "lint failure" was stale; root cause was 2 unresolved review threads; resolved via `resolveReviewThread` GraphQL mutation | **verified-ci**: PR merged at 2026-06-15T03:05:38Z by `app/github-actions` auto-merge within seconds of thread resolution; `mergeStateStatus` transitioned BLOCKED → UNKNOWN → MERGED |
 | ProjectHephaestus | 2026-06-26: PR #1646 for issue #1645 completed with literal `Closes #1645`, signed DCO commit, `state:implementation-go`, `gh pr merge --auto --squash`, and current-head Test/Required Checks verification | **verified-ci**: PR merged after Test workflow run 28256151963 and Required Checks run 28256238895 succeeded; an earlier pre-label Required Checks failure was stale and did not block the merge |
+| ProjectHephaestus | 2026-06-30: PR #1719 for issue #1465 showed advisory `auto-merge-policy` red after implementation-review GO because auto-merge was not armed yet; source fix was only `loop_runner.py` module-level `tempfile` hoist | **verified-ci**: drive-green armed auto-merge for branch `1465-auto-impl` at head `3c0ef9f3e0d6e4367354e89c139e73ac1e6de365`; arming record written at `build/.issue_implementer/drive-green-armed-1465.json`; PR reached green CI |
