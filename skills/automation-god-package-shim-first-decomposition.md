@@ -13,10 +13,14 @@ description: >-
   install extra (e.g. [automation]) so the library/product boundary is preserved,
   (7) consolidating a small cluster of always-co-imported modules into ONE canonical
   module while keeping the original paths as explicit re-export shims (the inverse
-  direction — merge, not split — but the same shim discipline applies).
+  direction — merge, not split — but the same shim discipline applies),
+  (8) decomposing a single oversized MODULE (one `.py` file, not a flat package) where
+  you cannot leave a flat-file shim AND create a same-named package — turn the module
+  into a `__init__`-as-shim PACKAGE instead, with a `_deps.py` indirection sub-module for
+  heavily-patched imported-into names and shared mutable state (UNVERIFIED — plan only, #1455).
 category: architecture
 date: 2026-06-30
-version: "2.1.0"
+version: "2.2.0"
 user-invocable: false
 verification: verified-local
 history: automation-god-package-shim-first-decomposition.history
@@ -36,6 +40,10 @@ tags:
   - re-export
   - ruff-f401
   - module-consolidation
+  - module-to-package
+  - init-shim
+  - deps-indirection
+  - patch-seam
 ---
 
 # Automation God-Package Shim-First Decomposition
@@ -44,11 +52,11 @@ tags:
 
 | Field | Value |
 | ------- | ------- |
-| **Date** | 2026-06-30 (v2.1.0) |
-| **Objective** | (v1.0.0) Decompose a 52-file flat god-package into 8 domain sub-packages via shim files. (v2.0.0) ALSO covers the inverse: consolidate a small cluster of always-co-imported config modules into ONE canonical module, keeping the originals as explicit re-export shims — executed for real in ProjectHephaestus #1441. (v2.1.0) ALSO records a verified-local SPLIT/move execution (#1443) and the **whole-test-tree patch-seam sweep** it surfaced |
-| **Outcome** | v1.0.0 plan for #1177 was never executed. v2.0.0 records a verified-local execution of the shim consolidation for #1441 ("Merge 4 Claude agent modules"): merge confirmed with ruff + mypy clean and a 145-test focused suite green. v2.1.0 records a verified-local SPLIT of 3 `*_state.py` modules into `state/` (#1443): full `tests/unit/automation` suite **2284 passed**, ruff + mypy clean — after a whole-test-tree patch-seam sweep fixed 4 failures the approved plan missed |
-| **Trigger** | Either direction: a flat package with 40+ .py files (split), OR a cluster of 3-4 tiny always-co-imported modules (merge). Both keep original module paths as explicit re-export shims |
-| **Verification** | verified-local (MERGE #1441: ruff + mypy + 145-test focused suite green. SPLIT #1443: ruff + mypy clean, full `tests/unit/automation` suite 2284 passed, 0 failed) |
+| **Date** | 2026-06-30 (v2.2.0) |
+| **Objective** | (v1.0.0) Decompose a 52-file flat god-package into 8 domain sub-packages via shim files. (v2.0.0) ALSO covers the inverse: consolidate a small cluster of always-co-imported config modules into ONE canonical module, keeping the originals as explicit re-export shims — executed for real in ProjectHephaestus #1441. (v2.1.0) ALSO records a verified-local SPLIT/move execution (#1443) and the **whole-test-tree patch-seam sweep** it surfaced. (v2.2.0) ALSO adds a THIRD shape — the **module-→-package (`__init__`-as-shim)** variant with a **`_deps.py` indirection** for heavily-patched imported-into names (planned for #1455; **UNVERIFIED — plan only**) |
+| **Outcome** | v1.0.0 plan for #1177 was never executed. v2.0.0 records a verified-local execution of the shim consolidation for #1441 ("Merge 4 Claude agent modules"): merge confirmed with ruff + mypy clean and a 145-test focused suite green. v2.1.0 records a verified-local SPLIT of 3 `*_state.py` modules into `state/` (#1443): full `tests/unit/automation` suite **2284 passed**, ruff + mypy clean — after a whole-test-tree patch-seam sweep fixed 4 failures the approved plan missed. v2.2.0 records a PLANNING session for #1455 (decompose the 2093-LoC, 46-function `github_api.py`): the module-→-package variant + `_deps`-indirection were designed but **NOT executed** — see the Risks note (R1, the patch-seam equivalence, is an open question) |
+| **Trigger** | Three shapes: a flat package with 40+ .py files (SPLIT), a cluster of 3-4 tiny always-co-imported modules (MERGE), OR a single oversized MODULE decomposed into a `__init__`-as-shim PACKAGE (module-→-package, #1455, unverified). All keep original import paths as explicit re-export shims |
+| **Verification** | verified-local for the executed MERGE (#1441) and SPLIT (#1443) core. The module-→-package variant + `_deps`-indirection (#1455) are **unverified (plan only)** — R1 (patch-seam equivalence) is unproven |
 | **History** | [changelog](./automation-god-package-shim-first-decomposition.history) |
 
 ## When to Use
@@ -66,6 +74,8 @@ Apply this skill when any of the following is true:
 - You are writing an **explicit `from X import (name as name, ...)` re-export shim** and need to know whether `# ruff: noqa: F401` is required (it is NOT — and adding it triggers RUF100)
 - A test reads a **private symbol** (`_KNOWN_MODELS`), calls `importlib.reload`, or pins a **logger name** (`caplog.at_level(..., logger="...")`) of a module you are about to turn into a shim — these tests CANNOT stay on the shim and must be repointed at the canonical module
 - **(Split direction, v2.1.0)** A test anywhere in the tree `mock.patch("...<flat_path>.<name>")` or `monkeypatch.setattr`s a name that the module you are moving **imported from elsewhere** (not one of the module's OWN public symbols) — after the move that bound name lives in the canonical sub-package and the flat shim no longer carries it, so the patch target vanishes. These seams hide in OTHER test files, not just the moved module's own test file, and require a whole-test-tree grep sweep (Step 8b below) — the `dir(shim)` parity test cannot catch them
+- **(Module-→-package, v2.2.0 — UNVERIFIED, plan only #1455)** The path you must decompose is itself a single oversized **module** (`github_api.py`, ~2000 LoC, 40+ functions), not a flat package. You cannot leave a flat-file `.py` shim AND create a same-named package — so the technique is to turn the module into a same-named **PACKAGE** whose `__init__.py` IS the shim (explicit `name as name` re-exports of every sub-module's public symbol). Under pytest `prepend` import mode the dotted path resolves to the package `__init__` identically to the old module, so import sites and `@patch("...<module>.X")` seams keep resolving
+- **(Module-→-package, v2.2.0 — UNVERIFIED, plan only #1455)** The module being decomposed is patched dozens-to-hundreds of times in tests, and most patched names are imported INTO it (from sibling library modules) or are shared MUTABLE module state (caches, circuit breakers). Consider a single internal `_deps.py` sub-module that holds those names; sub-modules reference them as module-ATTRIBUTE access (`_deps.<name>`, NOT a `from _deps import <name>` bound copy) so one rebind is seen by all callers — BUT see Risk R1: the patch-seam equivalence is unproven, and a large fraction of patch sites may still need repointing to `<module>._deps.<name>`
 
 ## Verified Workflow
 
@@ -179,6 +189,79 @@ def test_shim_reexports_match_canonical(shim_name):
             continue
         assert getattr(agent_config, name) is obj, f"{shim_name}.{name} drifted from agent_config"
 ```
+
+### Module-→-Package (`__init__`-as-Shim) — UNVERIFIED (plan only, #1455)
+
+> **Verification: UNVERIFIED. This entire subsection is a PLAN that was never executed.**
+> It was designed during a PLANNING session for ProjectHephaestus #1455 ("decompose
+> `hephaestus/automation/github_api.py` — a 2093-LoC, 46-function SRP violation"). The
+> module-→-package shape and the `_deps`-indirection pattern below are a **proposed extension**
+> of the verified workflow, not a verified-local result. **Risk R1 (the patch-seam equivalence)
+> is an open design question** — see "Risks / Unverified Assumptions (#1455)" below. Do NOT treat
+> any claim in this subsection as proven. The skill's overall `verification: verified-local`
+> field reflects only the executed #1441 (MERGE) and #1443 (SPLIT) core.
+
+Use this when the path to decompose is a single oversized **module** (one `.py` file), not a
+flat package. The MERGE and SPLIT variants both assume the unit you keep as a shim can stay a
+flat `.py` file. But when `github_api.py` itself must be broken up, you cannot keep a flat-file
+shim *and* introduce a same-named `github_api/` package — the two collide on the same dotted path.
+
+**The technique (proposed, unverified):**
+
+1. Turn `github_api.py` into a `github_api/` **package**. Move the 46 functions into
+   responsibility-clustered sub-modules (`_diff.py`, `_reviews.py`, `_issues.py`, `_labels.py`,
+   …) in leaf-to-root order (a single grep pass suggested a 9-way clustering — re-verify, see R3).
+2. The package `__init__.py` IS the shim: explicit `name as name` re-exports of every
+   sub-module's public symbol. Under pytest `prepend` import mode (`pyproject.toml`:
+   `pythonpath=["."]`, no `importmode=importlib`), the dotted path
+   `hephaestus.automation.github_api` resolves to the package `__init__` exactly as the old
+   module did, so import sites and `@patch("...github_api.X")` seams keep resolving — *for names
+   defined/re-exported directly on the package namespace* (but see R1 for imported-into names).
+3. **`_deps.py` indirection for heavily-patched imported-into names + shared mutable state.**
+   `github_api` is patched ~200× in tests (`github_api._gh_call` alone 88×, `get_repo_info` 34×,
+   `io_write_secure` 11×, `run` 6×) and holds shared MUTABLE state (`_label_cache`,
+   `_issue_state_cache`, `_GH_BREAKER`, `_GH_THROTTLE`). Most of these names are imported INTO
+   `github_api` from sibling library modules (`hephaestus.github.client`, `.git_utils`,
+   `hephaestus.io.utils`) — exactly the Step-8b hazard. The PROPOSED pattern: put all shared
+   mutable state + imported-through deps in ONE internal `_deps.py`; every sub-module references
+   them as **module-attribute access** `_deps.<name>` (NOT `from _deps import <name>`, which
+   would bind a copy) so a single rebind of `_deps.<name>` is seen by all callers; the package
+   `__init__` re-exports `<name> = _deps.<name>` as the public patch seam.
+
+   ```python
+   # github_api/_deps.py  (internal — single source of imported-into deps + mutable state)
+   from hephaestus.github.client import _gh_call, get_repo_info
+   from hephaestus.io.utils import write_secure as io_write_secure
+   _label_cache: set[str] | None = None
+   _issue_state_cache: dict = {}
+
+   # github_api/_diff.py  (a sub-module — attribute access, NOT `from _deps import _gh_call`)
+   from . import _deps
+   def get_pr_diff(pr): return _deps._gh_call(...)   # one rebind of _deps._gh_call reaches here
+
+   # github_api/__init__.py  (the shim — public patch seam)
+   from . import _deps
+   _gh_call = _deps._gh_call            # public re-export (BUT see R1 — may not be the live seam)
+   _label_cache = _deps._label_cache    # binds the INITIAL object (BUT see R2 — aliasing breaks on rebind)
+   ```
+
+**`__all__` is NOT a reliable public-surface inventory here.** `github_api.py`'s `__all__`
+(`:64-70`, approximate — re-confirm, R4) lists only 5 re-exported exception/helper names, NOT its
+46 own functions. So the wildcard-`import *` shim variant is UNSAFE for this module, and the
+explicit-per-symbol shim is mandatory. This also means the Step-0 pre-flight `grep -L '__all__'`
+check is **necessary-but-insufficient**: a module CAN define `__all__` and still have it cover
+only a fraction of the real public surface. After confirming a module defines `__all__`, also
+confirm `__all__` actually enumerates every public symbol you intend the shim to carry — diff
+`set(__all__)` against the module's public `def`/`class`/assignment names.
+
+#### Risks / Unverified Assumptions (#1455) — for reviewer focus
+
+| # | Risk (unverified, plan only) | Why it may break | What the reviewer must demand |
+| --- | ---------------------------- | ---------------- | ----------------------------- |
+| **R1** *(highest uncertainty — central design risk)* | The `_deps` patch-seam equivalence is **ASSUMED, not proven**. The plan claims re-exporting `_gh_call = _deps._gh_call` in `__init__` makes `@patch("github_api._gh_call")` reach sub-modules that call `_deps._gh_call(...)` | `mock.patch("github_api._gh_call")` rebinds the attribute on the `github_api` PACKAGE namespace, but sub-modules read `_deps._gh_call` — a DIFFERENT namespace. The patch is NOT seen unless tests repoint to `@patch("github_api._deps._gh_call")`. The plan waves at "both targets work" with no mechanism | A concrete proof-of-mechanism: one worked example showing a `github_api._gh_call` patch ACTUALLY intercepting a sub-module call. Realistic outcome: a large fraction of the ~200 patch sites must repoint to `github_api._deps.<name>` (or sub-modules use late `from . import github_api` binding) — contradicting the "zero churn / stay unchanged" claim |
+| **R2** | Mutable-state aliasing breaks on rebind | `_label_cache` / `_issue_state_cache` are REASSIGNED at runtime (`_deps._label_cache = parsed`). `__init__`'s `_label_cache = _deps._label_cache` binds the INITIAL object; after a sub-module reassigns `_deps._label_cache`, `github_api._label_cache` still points at the stale initial value | Repoint the 2 tests reading/patching `github_api._label_cache` / `_issue_state_cache` to `github_api._deps.<name>` — the plan only half-commits to this |
+| **R3** | Leaf/ordering and counts are unverified | "46 functions", the 9-way clustering, the `diff`→`reviews` leaf ordering, and the "~600 LoC per sub-module" target are from a SINGLE grep pass; counts/clusters go stale (cf. the dry-refactoring count-staleness lesson) | Re-grep the live file; confirm no sub-module retains a hidden cross-dependency (reviews→threads, issues→labels) beyond the assumed `_deps`-only edges |
+| **R4** | Line citations are approximate | `github_api.py:22-36` (import block) and `:64-70` (`__all__`) were read once | Treat as approximate; re-confirm before editing |
 
 ### Quick Reference
 
@@ -500,6 +583,9 @@ A reviewer or implementer should check each one before executing the migration.
 | Leave a private-symbol / reload / caplog-logger test pointed at the shim | Kept `test_claude_models.py` importing the original (now-shim) module path | The shim deliberately omits privates (`_KNOWN_MODELS`), and the merged module's logger name changed to `hephaestus.automation.agent_config` (uses `getLogger(__name__)`), so `caplog.at_level(..., logger="...claude_models")` captured nothing | Repoint such tests via a local alias `from ... import agent_config as claude_models` AND retarget every caplog logger-name string to the canonical module's logger |
 | Rely only on focused per-module tests to catch shim drift | Assumed the focused suites covered every re-exported symbol | A missing re-export surfaces only as an `AttributeError` at a future call site — focused tests that don't touch that symbol stay green | Add a parametrized full-surface parity test asserting every public name `is` the same object in the canonical module (filter module objects out of `dir()`) |
 | Repoint patch seams only in the moved module's own test file | Followed a plan that listed patch-string repoints for the three moved test files + one known coupling | `test_planner_loop.py` / `test_planner_main.py` patched `planner_state.prefetch_issue_states` / `.fetch_all_issue_labels_graphql` (names imported INTO the module, NOT re-exported by the shim); 4 failures surfaced only on the first full-suite run | Grep the WHOLE test tree for `patch("<flat_path>.<anyname>")`; repoint every imported-into name to the canonical module — the shim carries only the module's OWN symbols |
+| Assume `@patch("github_api._gh_call")` reaches sub-modules calling `_deps._gh_call` *(unverified — plan only, #1455)* | The #1455 plan re-exported `_gh_call = _deps._gh_call` in the package `__init__` and assumed both patch targets are equivalent | `mock.patch` rebinds the attribute on the `github_api` PACKAGE namespace; sub-modules read `_deps._gh_call` on a DIFFERENT namespace, so the patch is not seen there (UNVERIFIED — this is the predicted failure, R1, not an observed one) | Demand a proof-of-mechanism worked example FIRST; expect to repoint a large fraction of the ~200 patch sites to `github_api._deps.<name>` rather than claiming "function patches stay unchanged" |
+| Re-export reassigned mutable state via `_label_cache = _deps._label_cache` in `__init__` *(unverified — plan only, #1455)* | The #1455 plan bound the package-level `_label_cache` to `_deps._label_cache` once at import | After a sub-module REASSIGNS `_deps._label_cache = parsed`, the `__init__`-level alias still points at the stale initial object (UNVERIFIED — predicted, R2) | Repoint tests that read/patch `github_api._label_cache` / `_issue_state_cache` to `github_api._deps.<name>`; do not rely on the `__init__` alias for reassigned state |
+| Trust `__all__` as the public-surface inventory before a module-→-package shim *(unverified — plan only, #1455)* | `github_api.py` defines `__all__`, so the pre-flight `grep -L '__all__'` check passed | `__all__` listed only 5 re-exported exception/helper names, NOT the module's 46 own functions — a wildcard `import *` shim would have dropped them all (R-context) | The `grep -L '__all__'` check is necessary-but-insufficient; also diff `set(__all__)` against the module's actual public def/class names, and prefer the explicit-per-symbol shim |
 
 ## Results & Parameters
 
@@ -622,11 +708,13 @@ python3 -c "import claude; print(type(claude), getattr(claude, '__file__', 'no _
 | ProjectHephaestus | issue #1441 "Merge 4 Claude agent modules" (executed) | **verified-local** — Shim Consolidation (merge direction) run end-to-end: agent_config.py created, 3 modules turned into explicit re-export shims, claude_invoke.py kept separate; ruff + mypy clean, 145-test focused suite green (full suite re-running at capture) |
 | ProjectHephaestus | issue #1443 "Move *_state.py into state/" (executed, SPLIT direction) | **verified-local** — 3 modules moved into `state/` with explicit `name as name` shims; `_review_phase.py` repointed to `from .state import review as review_state`; `implementer_phase_runner.py:42,77` left on shim paths (preserves #714 patch surface + no-cycle guard). The whole-test-tree patch-seam sweep was the decisive fix (4 failures from imported-into names patched on the flat path). ruff + mypy clean; full `tests/unit/automation` suite 2284 passed, 0 failed |
 | ProjectHephaestus | Plan written for issue #1177 (not yet executed) | Verification level: unverified; the full 52-file SPLIT workflow remains a proposal |
+| ProjectHephaestus | Plan written for issue #1455 "decompose `github_api.py` (2093 LoC, 46 fns)" (NOT executed) | **unverified (plan only)** — module-→-package (`__init__`-as-shim) variant + `_deps`-indirection for the ~200 patch sites + shared mutable state. R1 (the `_deps` patch-seam equivalence) is an open question; see the "Risks / Unverified Assumptions (#1455)" table |
 
 ## References
 
 - [ProjectHephaestus issue #1441](https://github.com/HomericIntelligence/ProjectHephaestus/issues/1441) — merge direction (Shim Consolidation), verified-local execution
 - [ProjectHephaestus issue #1443](https://github.com/HomericIntelligence/ProjectHephaestus/issues/1443) — split direction (move `*_state.py` into `state/`), verified-local; surfaced the whole-test-tree patch-seam sweep
 - [ProjectHephaestus issue #1177](https://github.com/HomericIntelligence/ProjectHephaestus/issues/1177) — source issue for the full 52-file split workflow
+- [ProjectHephaestus issue #1455](https://github.com/HomericIntelligence/ProjectHephaestus/issues/1455) — decompose `github_api.py` (2093 LoC, 46 fns); source of the **unverified** module-→-package (`__init__`-as-shim) variant + `_deps`-indirection (plan only, R1 unproven)
 - [python-module-decomposition-and-refactor-patterns.md](python-module-decomposition-and-refactor-patterns.md) — single-module decomposition (Phase 11/12 for CLI extraction and sibling-cycle fixes)
 - [python-circular-import-symbol-extraction.md](python-circular-import-symbol-extraction.md) — leaf-module extraction for circular import errors

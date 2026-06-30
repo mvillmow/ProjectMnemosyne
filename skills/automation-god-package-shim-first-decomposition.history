@@ -1,5 +1,68 @@
 # automation-god-package-shim-first-decomposition — History
 
+## v2.2.0 (2026-06-30)
+
+**Changed by:** ProjectHephaestus issue #1455 "decompose `hephaestus/automation/github_api.py`
+— a 2093-LoC, 46-function SRP violation" — a PLANNING session. The plan was **NOT executed**, so
+all new material in this version is a proposed extension, not a verified-local result.
+**Verification:** unverified (plan only) for the new material; the skill's overall
+`verification: verified-local` field is UNCHANGED — it still reflects only the executed #1441
+(MERGE) and #1443 (SPLIT) core.
+
+### What changed
+
+- Added a THIRD variant — **Module-→-Package (`__init__`-as-shim)** — to `## Verified Workflow`,
+  clearly fenced as UNVERIFIED (plan only, #1455). When the path to decompose is a single
+  oversized MODULE (`github_api.py`), you cannot leave a flat-file shim AND create a same-named
+  package; the technique is to turn the module into a same-named PACKAGE whose `__init__.py` IS
+  the shim (explicit `name as name` re-exports). Under pytest `prepend` mode the dotted path
+  resolves to the package `__init__` identically to the old module.
+- Documented the **`_deps.py` indirection** pattern for heavily-patched imported-into names
+  (`github_api` patched ~200×; `_gh_call` alone 88×) + shared mutable state
+  (`_label_cache`, `_issue_state_cache`, `_GH_BREAKER`, `_GH_THROTTLE`): one internal `_deps.py`
+  holding them, sub-modules using module-ATTRIBUTE access `_deps.<name>` (not a bound copy), and
+  the `__init__` re-exporting `<name> = _deps.<name>` as the public patch seam.
+- Added a **"Risks / Unverified Assumptions (#1455)"** table with R1-R4. **R1 (the central design
+  risk): the `_deps` patch-seam equivalence is ASSUMED, not proven** — `@patch("github_api.X")`
+  rebinds the package namespace while sub-modules read `_deps.X` on a different namespace, so a
+  large fraction of the ~200 patch sites may need repointing to `github_api._deps.<name>`,
+  contradicting the plan's "zero churn" claim. R2 mutable-state aliasing breaks on rebind; R3
+  leaf/ordering/counts unverified (single grep pass); R4 line citations approximate.
+- Added the caveat that **`__all__` is NOT a reliable public-surface inventory**:
+  `github_api.py`'s `__all__` lists only 5 re-exported names, NOT its 46 own functions, so the
+  pre-flight `grep -L '__all__'` check is necessary-but-insufficient and the wildcard `import *`
+  shim is UNSAFE here.
+- Added two "When to Use" triggers and an 8th `description` clause for the module-→-package
+  variant (both marked unverified, #1455); added three new Failed-Attempts rows for R1/R2 and the
+  `__all__` trap (all marked unverified, plan only); added a `## Verified On` row and a #1455
+  reference; updated the Overview table to v2.2.0; new tags `module-to-package`, `init-shim`,
+  `deps-indirection`, `patch-seam`.
+- Bumped version 2.1.0 → 2.2.0 (MINOR — new variant + new "When to Use" triggers + new
+  Failed-Attempts/risk rows; does not rewrite the verified workflow or change a core
+  recommendation).
+
+### Why
+
+Planning #1455 surfaced a shape the prior versions did not cover: the unit to keep as a shim is
+itself the module being decomposed, so a flat-file shim is impossible. The `__init__`-as-shim
+package answers that, and the `_deps`-indirection is the proposed answer to `github_api` being
+patched ~200× across the test suite. But the plan was never run, and its central claim — that the
+`_deps` re-export makes existing `@patch("github_api.<name>")` seams keep working — is unproven
+(R1) and most likely false without repointing patch sites. Capturing it as UNVERIFIED, with R1
+flagged as the open question and a proof-of-mechanism demanded, is exactly what a future
+executor (or reviewer of that execution) needs so the patch-seam equivalence is validated BEFORE
+trusting the "function patches stay unchanged" claim.
+
+### Snapshot reference
+
+Previous version (v2.1.0) full body is preserved by the v2.1.0 entry below (which snapshots
+v2.0.0, which snapshots v1.0.0). v2.2.0 is a strict superset of v2.1.0: it adds the
+module-→-package variant subsection, the #1455 Risks table, three Failed-Attempts rows, the
+`__all__` caveat, and the #1455 Verified On / reference rows — without rewriting any verified
+v2.1.0 content or downgrading the `verification: verified-local` field.
+
+---
+
 ## v2.1.0 (2026-06-30)
 
 **Changed by:** ProjectHephaestus issue #1443 "Move `*_state.py` into `state/`" — first
